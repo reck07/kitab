@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Kitab</string>
+    <string name="title_activity_main">Kitab</string>
+    <string name="package_name">com.kitab.app</string>
+    <string name="custom_url_scheme">com.kitab.app</string>
+</resources>
