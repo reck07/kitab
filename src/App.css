@@ -662,6 +662,7 @@ body {
     gap: 1rem;
   }
 }
+<<<<<<< HEAD
 
 /* Auth modal */
 .auth-overlay {
@@ -762,3 +763,5 @@ body {
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+=======
+>>>>>>> b95ce7254a8b813cef834ed02a8364210c343079

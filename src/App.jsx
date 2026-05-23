@@ -1,5 +1,9 @@
 import { useState, useEffect, useRef, useMemo } from 'react'
+<<<<<<< HEAD
 import { supabase, isSupabaseConfigured } from './supabaseClient'
+=======
+import { supabase } from './supabaseClient'
+>>>>>>> b95ce7254a8b813cef834ed02a8364210c343079
 import './App.css'
 import Navbar from './Navbar'
 import NoteCard from './NoteCard'
@@ -8,8 +12,11 @@ import { Plus, Star, Archive, Network, X, Calculator as CalculatorIcon, Pencil }
 import { isNoteLocked, encryptNoteContent, decryptNoteContent } from './crypto'
 import Calculator from './Calculator'
 import DrawingPad from './DrawingPad'
+<<<<<<< HEAD
 import Auth from './Auth'
 import { testSupabaseConnection } from './lib/supabaseHealth'
+=======
+>>>>>>> b95ce7254a8b813cef834ed02a8364210c343079
 
 const getGreeting = () => {
   const hour = new Date().getHours();
@@ -153,7 +160,11 @@ const FloatingMenu = ({ onAdd, onGraph, onExportJSON, onExportPDF, onCalculator,
 };
 
 function App() {
+<<<<<<< HEAD
   const hasSupabase = isSupabaseConfigured && Boolean(supabase);
+=======
+  const hasSupabase = Boolean(supabase);
+>>>>>>> b95ce7254a8b813cef834ed02a8364210c343079
   const [notes, setNotes] = useState(() => {
     const local = JSON.parse(localStorage.getItem('notes') || '[]');
     if (local.length > 0) return local;
@@ -185,11 +196,19 @@ function App() {
   const [showGraph, setShowGraph] = useState(false);
   const [showCalculator, setShowCalculator] = useState(false);
   const [showDrawingPad, setShowDrawingPad] = useState(false);
+<<<<<<< HEAD
   const [showAuth, setShowAuth] = useState(false);
   const [dbStatus, setDbStatus] = useState('checking');
 
   async function fetchNotes(userId) {
     if (!supabase) return;
+=======
+
+  async function fetchNotes(userId) {
+    if (!supabase) {
+      return;
+    }
+>>>>>>> b95ce7254a8b813cef834ed02a8364210c343079
 
     const { data, error } = await supabase
       .from('notes')
@@ -198,6 +217,7 @@ function App() {
       .order('isPinned', { ascending: false })
       .order('updated_at', { ascending: false });
 
+<<<<<<< HEAD
     if (error) {
       console.error('fetchNotes error:', error);
       if (error.code === '42P01' || error.message?.includes('does not exist')) {
@@ -233,10 +253,29 @@ function App() {
       await supabase.from('notes').upsert({ ...defaultNote, user_id: userId });
     }
     setDbStatus('connected');
+=======
+    if (data && data.length > 0) {
+      setNotes(data);
+      localStorage.setItem('notes', JSON.stringify(data));
+      setActiveNoteId(prev => data.some(n => n.id === prev) ? prev : data[0].id);
+    } else {
+      const localNotes = JSON.parse(localStorage.getItem('notes') || '[]');
+      if (localNotes.length > 0) {
+        localNotes.forEach(n => supabase.from('notes').upsert({ ...n, user_id: userId }).then());
+      } else {
+        const defaultNote = generateDefaultNote(userId);
+        setNotes([defaultNote]);
+        setActiveNoteId(defaultNote.id);
+        localStorage.setItem('notes', JSON.stringify([defaultNote]));
+        supabase.from('notes').upsert(defaultNote).then();
+      }
+    }
+>>>>>>> b95ce7254a8b813cef834ed02a8364210c343079
   }
 
   useEffect(() => {
     if (!supabase) {
+<<<<<<< HEAD
       setDbStatus('unconfigured');
       return undefined;
     }
@@ -262,6 +301,12 @@ function App() {
     };
     checkDb();
 
+=======
+      return undefined;
+    }
+
+    // Handle Auth Session
+>>>>>>> b95ce7254a8b813cef834ed02a8364210c343079
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
       if (session?.user) fetchNotes(session.user.id);
@@ -269,6 +314,7 @@ function App() {
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
+<<<<<<< HEAD
       if (session?.user) {
         fetchNotes(session.user.id);
       } else {
@@ -276,11 +322,15 @@ function App() {
         setNotes(localNotes.length > 0 ? localNotes : [generateDefaultNote()]);
         setActiveNoteId(localNotes[0]?.id ?? null);
       }
+=======
+      if (session?.user) fetchNotes(session.user.id);
+>>>>>>> b95ce7254a8b813cef834ed02a8364210c343079
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
+<<<<<<< HEAD
   // Real-time sync when logged in (second tab / device updates)
   useEffect(() => {
     if (!supabase || !user?.id) return undefined;
@@ -301,6 +351,8 @@ function App() {
     };
   }, [user?.id]);
 
+=======
+>>>>>>> b95ce7254a8b813cef834ed02a8364210c343079
   // Update theme attribute
   useEffect(() => {
     document.documentElement.setAttribute('data-theme', theme);
@@ -454,11 +506,15 @@ function App() {
 
   const exportPDF = () => {
     if (!activeNote) return;
+<<<<<<< HEAD
     try {
       window.print();
     } catch (e) {
       alert('Printing/PDF export is not natively supported on this device.');
     }
+=======
+    window.print();
+>>>>>>> b95ce7254a8b813cef834ed02a8364210c343079
   };
 
   const handleRemoveTag = (noteId, tagToRemove) => {
@@ -693,6 +749,7 @@ function App() {
   const showSidebar = isSidebarOpen;
   const showEditor = isMobile ? isEditorOpen : true;
 
+<<<<<<< HEAD
   const handleLogout = async () => {
     if (supabase) {
       await supabase.auth.signOut();
@@ -704,6 +761,8 @@ function App() {
     }
   };
 
+=======
+>>>>>>> b95ce7254a8b813cef834ed02a8364210c343079
   return (
     <div className="app-layout">
       <Navbar 
@@ -712,10 +771,13 @@ function App() {
         onMenuToggle={() => setIsSidebarOpen(!isSidebarOpen)} 
         isMobile={isMobile} 
         isSidebarOpen={showSidebar} 
+<<<<<<< HEAD
         user={user}
         onLoginClick={() => setShowAuth(true)}
         onLogout={handleLogout}
         dbStatus={dbStatus}
+=======
+>>>>>>> b95ce7254a8b813cef834ed02a8364210c343079
       />
       
       <div 
@@ -874,6 +936,7 @@ function App() {
       {showDrawingPad && (
         <DrawingPad onClose={() => setShowDrawingPad(false)} />
       )}
+<<<<<<< HEAD
 
       {showAuth && (
         <Auth
@@ -888,6 +951,8 @@ function App() {
           Database table missing. Open Supabase SQL Editor and run <code>supabase/schema.sql</code>, then refresh.
         </div>
       )}
+=======
+>>>>>>> b95ce7254a8b813cef834ed02a8364210c343079
     </div>
   )
 }

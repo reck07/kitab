@@ -1,3 +1,4 @@
+<<<<<<< HEAD
 import { createClient } from '@supabase/supabase-js';
 
 export const supabaseUrl = import.meta.env.VITE_SUPABASE_URL?.trim().replace(/\/$/, '');
@@ -36,3 +37,11 @@ export const supabase = isSupabaseConfigured
       },
     })
   : null;
+=======
+import { createClient } from '@supabase/supabase-js';
+
+const supabaseUrl = import.meta.env.VITE_SUPABASE_URL;
+const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY;
+
+export const supabase = supabaseUrl && supabaseAnonKey ? createClient(supabaseUrl, supabaseAnonKey) : null;
+>>>>>>> b95ce7254a8b813cef834ed02a8364210c343079
