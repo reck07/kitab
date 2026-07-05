@@ -222,12 +222,18 @@ function App() {
       return;
     }
 
-    const { data } = await supabase
-      .from('notes')
-      .select('*')
-      .eq('user_id', userId)
-      .order('isPinned', { ascending: false })
-      .order('updated_at', { ascending: false });
+    let data;
+    try {
+      const result = await supabase
+        .from('notes')
+        .select('*')
+        .eq('user_id', userId)
+        .order('isPinned', { ascending: false })
+        .order('updated_at', { ascending: false });
+      data = result.data;
+    } catch (e) {
+      data = null;
+    }
 
     if (data && data.length > 0) {
       setNotes(data);
@@ -236,13 +242,13 @@ function App() {
     } else {
       const localNotes = JSON.parse(localStorage.getItem('notes') || '[]');
       if (localNotes.length > 0) {
-        localNotes.forEach(n => supabase.from('notes').upsert({ ...n, user_id: userId }).then());
+        localNotes.forEach(n => supabase.from('notes').upsert({ ...n, user_id: userId }).then().catch(() => {}));
       } else {
         const defaultNote = generateDefaultNote(userId);
         setNotes([defaultNote]);
         setActiveNoteId(defaultNote.id);
         localStorage.setItem('notes', JSON.stringify([defaultNote]));
-        supabase.from('notes').upsert(defaultNote).then();
+        supabase.from('notes').upsert(defaultNote).then().catch(() => {});
       }
     }
   }
@@ -264,10 +270,6 @@ function App() {
       setUser(session?.user ?? null);
       if (session?.user) {
         fetchNotes(session.user.id);
-      } else {
-        setNotes([]);
-        localStorage.removeItem('notes');
-        setActiveNoteId(null);
       }
     });
 
@@ -289,10 +291,7 @@ function App() {
   const handleSignOut = async () => {
     await supabase.auth.signOut();
     setUser(null);
-    setNotes([]);
-    localStorage.removeItem('notes');
     localStorage.removeItem('guestMode');
-    setActiveNoteId(null);
     setIsGuest(false);
   };
 
@@ -387,9 +386,8 @@ function App() {
       localStorage.setItem('notes', JSON.stringify(currentNotes));
       if (userRef.current && supabase) {
         supabase.from('notes').upsert({ ...latestNote, user_id: userRef.current.id }).then(() => triggerSavedIndicator()).catch(() => triggerSavedIndicator());
-      } else {
-        triggerSavedIndicator();
       }
+      triggerSavedIndicator();
     }, 800);
   };
 
@@ -423,7 +421,9 @@ function App() {
     const processedNote = actions.length > 0 ? applyActions(newNote, actions) : newNote;
     if (actions.length > 0) Object.assign(newNote, processedNote);
     
-    if (user && supabase) await supabase.from('notes').insert(newNote);
+    if (user && supabase) {
+      supabase.from('notes').insert(newNote).then().catch(() => {});
+    }
     
     const updated = [newNote, ...notes];
     setNotes(updated);
@@ -444,7 +444,7 @@ function App() {
     setNotes(updatedNotes);
     localStorage.setItem('notes', JSON.stringify(updatedNotes));
     if (user && supabase) {
-      supabase.from('notes').upsert({ ...updatedNotes.find(n => n.id === id), user_id: user.id }).then();
+      supabase.from('notes').upsert({ ...updatedNotes.find(n => n.id === id), user_id: user.id }).then().catch(() => {});
     }
     setActiveNoteId(prev => prev === id ? (updatedNotes.find(n => !n.isRecycled)?.id || null) : prev);
   };
@@ -456,7 +456,7 @@ function App() {
     setNotes(updatedNotes);
     localStorage.setItem('notes', JSON.stringify(updatedNotes));
     if (user && supabase) {
-      supabase.from('notes').upsert({ ...updatedNotes.find(n => n.id === id), user_id: user.id }).then();
+      supabase.from('notes').upsert({ ...updatedNotes.find(n => n.id === id), user_id: user.id }).then().catch(() => {});
     }
     setActiveNoteId(id);
   };
@@ -464,7 +464,9 @@ function App() {
   const permanentlyDelete = async (id) => {
     if (!window.confirm("Permanently delete this note? This cannot be undone.")) return;
     if (saveTimeoutsRef.current[id]) clearTimeout(saveTimeoutsRef.current[id]);
-    if (user && supabase) await supabase.from('notes').delete().eq('id', id);
+    if (user && supabase) {
+      try { await supabase.from('notes').delete().eq('id', id); } catch (e) {}
+    }
     const remainingNotes = notes.filter(n => n.id !== id);
     setNotes(remainingNotes);
     localStorage.setItem('notes', JSON.stringify(remainingNotes));
@@ -501,17 +503,20 @@ function App() {
     
     const textToSummarize = isNoteLocked(note) ? unlockedContentById[id] : note.content;
 
-    triggerSavedIndicator(); // Show loading state
-    const { data, error } = await supabase.functions.invoke('summarize-note', {
-      body: { content: textToSummarize, format: format, prompt: customPrompt }
-    });
+    triggerSavedIndicator();
+    try {
+      const { data, error } = await supabase.functions.invoke('summarize-note', {
+        body: { content: textToSummarize, format: format, prompt: customPrompt }
+      });
 
-    // Assuming your edge function returns the generated content in a "result" or "summary" field
-    if (data?.result || data?.summary) {
-      const aiLabel = customPrompt ? `AI Response to "${customPrompt}"` : `AI Generated ${format.toUpperCase()}`;
-      handleEditorUpdate(id, { content: textToSummarize + `<br><br><b>${aiLabel}:</b><br> ${data.result || data.summary}` });
-    } else if (error) {
-      alert('Unable to summarize note right now.');
+      if (data?.result || data?.summary) {
+        const aiLabel = customPrompt ? `AI Response to "${customPrompt}"` : `AI Generated ${format.toUpperCase()}`;
+        handleEditorUpdate(id, { content: textToSummarize + `<br><br><b>${aiLabel}:</b><br> ${data.result || data.summary}` });
+      } else if (error) {
+        alert('Unable to summarize note right now.');
+      }
+    } catch (e) {
+      alert('AI summary requires Supabase edge functions to be configured.');
     }
   };
 
@@ -525,10 +530,9 @@ function App() {
     
     if (user && supabase) {
       const noteToSync = updatedNotes.find(n => n.id === noteId);
-      supabase.from('notes').upsert({ ...noteToSync, user_id: user.id }).then(() => triggerSavedIndicator());
-    } else {
-      triggerSavedIndicator();
+      supabase.from('notes').upsert({ ...noteToSync, user_id: user.id }).then(() => triggerSavedIndicator()).catch(() => triggerSavedIndicator());
     }
+    triggerSavedIndicator();
   };
 
   const allTags = useMemo(() => {
