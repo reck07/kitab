@@ -1,5 +1,5 @@
 import { useRef, useEffect, useState } from 'react';
-import { List, Heading1, Heading2, MessageSquare, Mic, Share2, Lock, Pin, Star, Archive, X, ArrowLeft, Image as ImageIcon, Smile, Bot, SpellCheck, FileText, ChevronRight, CheckSquare, Layout, Trash2, RotateCcw } from 'lucide-react';
+import { List, Heading1, Heading2, MessageSquare, Mic, Share2, Lock, Pin, Star, Archive, X, ArrowLeft, Image as ImageIcon, Smile, Bot, SpellCheck, FileText, ChevronRight, CheckSquare, Layout, Trash2, RotateCcw, FilePlus } from 'lucide-react';
 import Tesseract from 'tesseract.js';
 import { PAPER_TYPES, CANVAS_SIZES, getPaperType } from './paperTypes';
 import { suggestTags } from './autoTag';
@@ -28,6 +28,8 @@ const NoteEditor = ({
   editorActionsRef,
   onToggleFocus,
   focusMode,
+  onSaveTemplate,
+  onLoadTemplate,
 }) => {
   const editorRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -344,6 +346,9 @@ const NoteEditor = ({
           <button className="btn-icon sm" onClick={() => setShowLayoutSettings(!showLayoutSettings)} title="Size"><Layout size={15} /></button>
           <button className="btn-icon sm" onClick={onSummarize} title="AI"><Bot size={15} /></button>
           <button className="btn-icon sm" onClick={onToggleFocus} title="Focus Mode" style={{ opacity: focusMode ? 1 : 0.5 }}><Layout size={15} /></button>
+          <div className="toolbar-divider"></div>
+          <button className="btn-icon sm" onClick={onSaveTemplate} title="Save as Template"><FileText size={15} /></button>
+          <button className="btn-icon sm" onClick={onLoadTemplate} title="New from Template"><FilePlus size={15} /></button>
           {isRecording && <span className="rec-badge">🔴</span>}
           {isScanningImage && <span className="scan-badge">📸</span>}
         </div>
