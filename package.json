@@ -9,7 +9,11 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "cap:sync": "npm run build && npx cap sync android",
+    "android:build": "npm run cap:sync && cd android && gradlew.bat assembleDebug",
+    "android:release": "npm run cap:sync && cd android && gradlew.bat assembleRelease",
+    "android:open": "npx cap open android"
   },
   "dependencies": {
     "@capacitor/android": "^8.4.1",

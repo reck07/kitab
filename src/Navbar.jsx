@@ -1,6 +1,6 @@
 import { Sun, Moon, Coffee, Menu, X, LogOut, User } from 'lucide-react';
 
-const Navbar = ({ theme, onThemeChange, onMenuToggle, isSidebarOpen, user, onSignOut }) => {
+const Navbar = ({ theme, onThemeChange, onMenuToggle, isSidebarOpen, user, onSignOut, isGuest, onLogin }) => {
   return (
     <header className="app-header">
       <div className="nav-brand">
@@ -23,6 +23,15 @@ const Navbar = ({ theme, onThemeChange, onMenuToggle, isSidebarOpen, user, onSig
             <span style={{ maxWidth: 140, whiteSpace: 'nowrap', overflow: 'hidden', textOverflow: 'ellipsis' }}>{user.email}</span>
             <button className="btn-logout" onClick={onSignOut} title="Sign out">
               <LogOut size={14} />
+            </button>
+          </div>
+        )}
+        {isGuest && !user && (
+          <div className="user-pill">
+            <span className="avatar">G</span>
+            <span>Guest</span>
+            <button className="btn-logout" onClick={onLogin} title="Sign in">
+              <User size={14} />
             </button>
           </div>
         )}

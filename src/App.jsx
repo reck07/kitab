@@ -5,7 +5,7 @@ import Navbar from './Navbar'
 import Login from './Login'
 import NoteCard from './NoteCard'
 import NoteEditor from './NoteEditor'
-import { Star, Archive, X, Palette, Layout, Shield, QrCode, Zap } from 'lucide-react'
+import { Star, Archive, X, Palette, Layout, Shield, QrCode, Zap, Trash2 } from 'lucide-react'
 import { isNoteLocked, encryptNoteContent, decryptNoteContent } from './crypto'
 import Calculator from './Calculator'
 import DrawingPad from './DrawingPad'
@@ -52,6 +52,7 @@ const generateDefaultNote = (userId = null) => ({
   isPinned: false,
   isFavorite: false,
   isArchived: false,
+  isRecycled: false,
   tags: ['ui', 'design', 'welcome'],
   folder: 'Design Notes',
   paperStyle: DEFAULT_NOTE_CONFIG.paperType,
@@ -178,6 +179,7 @@ function App() {
   const [notes, setNotes] = useState(() => JSON.parse(localStorage.getItem('notes') || '[]'));
   const [user, setUser] = useState(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const [isGuest, setIsGuest] = useState(() => localStorage.getItem('guestMode') === 'true');
   const [activeNoteId, setActiveNoteId] = useState(() => {
     const localNotes = JSON.parse(localStorage.getItem('notes') || '[]');
     return localNotes.length > 0 ? localNotes[0].id : null;
@@ -199,6 +201,7 @@ function App() {
   const [unlockedContentById, setUnlockedContentById] = useState({});
   const [notePasswordsById, setNotePasswordsById] = useState({});
   const [showArchived, setShowArchived] = useState(false);
+  const [showTrash, setShowTrash] = useState(false);
   const [showGraph, setShowGraph] = useState(false);
   const [showCalculator, setShowCalculator] = useState(false);
   const [showDrawingPad, setShowDrawingPad] = useState(false);
@@ -288,7 +291,14 @@ function App() {
     setUser(null);
     setNotes([]);
     localStorage.removeItem('notes');
+    localStorage.removeItem('guestMode');
     setActiveNoteId(null);
+    setIsGuest(false);
+  };
+
+  const handleSkipLogin = () => {
+    setIsGuest(true);
+    localStorage.setItem('guestMode', 'true');
   };
 
   // Update theme attribute and CSS variables
@@ -397,6 +407,7 @@ function App() {
       isPinned: false, // New field
       isFavorite: false, // New field
       isArchived: false,
+      isRecycled: false,
       tags: [],
       folder: selectedFolder || '',
       paperStyle: 'ruled',
@@ -425,18 +436,39 @@ function App() {
   };
 
   const removePage = async (id) => {
-    if (!window.confirm("Are you sure you want to delete this note?")) return;
+    if (!window.confirm("Move this note to trash?")) return;
 
-    if (user && supabase) await supabase.from('notes').delete().eq('id', id);
+    const updatedNotes = notes.map(n =>
+      n.id === id ? { ...n, isRecycled: true, updated_at: new Date().toISOString() } : n
+    );
+    setNotes(updatedNotes);
+    localStorage.setItem('notes', JSON.stringify(updatedNotes));
+    if (user && supabase) {
+      supabase.from('notes').upsert({ ...updatedNotes.find(n => n.id === id), user_id: user.id }).then();
+    }
+    setActiveNoteId(prev => prev === id ? (updatedNotes.find(n => !n.isRecycled)?.id || null) : prev);
+  };
+
+  const restoreNote = async (id) => {
+    const updatedNotes = notes.map(n =>
+      n.id === id ? { ...n, isRecycled: false, updated_at: new Date().toISOString() } : n
+    );
+    setNotes(updatedNotes);
+    localStorage.setItem('notes', JSON.stringify(updatedNotes));
+    if (user && supabase) {
+      supabase.from('notes').upsert({ ...updatedNotes.find(n => n.id === id), user_id: user.id }).then();
+    }
+    setActiveNoteId(id);
+  };
+
+  const permanentlyDelete = async (id) => {
+    if (!window.confirm("Permanently delete this note? This cannot be undone.")) return;
     if (saveTimeoutsRef.current[id]) clearTimeout(saveTimeoutsRef.current[id]);
+    if (user && supabase) await supabase.from('notes').delete().eq('id', id);
     const remainingNotes = notes.filter(n => n.id !== id);
     setNotes(remainingNotes);
     localStorage.setItem('notes', JSON.stringify(remainingNotes));
     if (activeNoteId === id) {
-      if (isMobile && remainingNotes.length === 0) {
-        setIsEditorOpen(false); // Close editor if no notes left on mobile
-        setIsSidebarOpen(true); // Show sidebar
-      }
       setActiveNoteId(remainingNotes.length > 0 ? remainingNotes[0].id : null);
     }
   };
@@ -521,9 +553,10 @@ function App() {
         (n.folder || '').toLowerCase().includes(searchQuery.toLowerCase());
       const matchesTag = !selectedTag || n.tags?.includes(selectedTag);
       const matchesFavorites = !showFavorites || n.isFavorite; // Filter by favorites
-      const matchesArchive = showArchived ? n.isArchived : !n.isArchived;
+      const matchesArchive = showTrash ? true : (showArchived ? n.isArchived : !n.isArchived);
+      const matchesTrash = showArchived ? true : (showTrash ? n.isRecycled : !n.isRecycled);
       const matchesFolder = !selectedFolder || n.folder === selectedFolder;
-      return matchesSearch && matchesTag && matchesFavorites && matchesArchive && matchesFolder;
+      return matchesSearch && matchesTag && matchesFavorites && matchesArchive && matchesTrash && matchesFolder;
     });
   
     return filtered.sort((a, b) => {
@@ -780,7 +813,7 @@ function App() {
     <div className={`app-layout ${focusMode ? 'focus-mode' : ''}`}>
       {authLoading ? (
         <div className="loading-screen">Loading...</div>
-      ) : user ? (
+      ) : user || isGuest ? (
         <>
           <Navbar 
             theme={theme} 
@@ -790,6 +823,8 @@ function App() {
             isSidebarOpen={showSidebar}
             user={user}
             onSignOut={handleSignOut}
+            isGuest={isGuest}
+            onLogin={() => { localStorage.removeItem('guestMode'); setIsGuest(false); }}
           />
           
           <div 
@@ -851,6 +886,9 @@ function App() {
             <button className={`btn-hexagon ${showArchived ? 'active' : ''}`} onClick={() => setShowArchived(!showArchived)} title="Show Archived">
               <Archive size={16} fill={showArchived ? 'currentColor' : 'none'} />
             </button>
+            <button className={`btn-hexagon ${showTrash ? 'active' : ''}`} onClick={() => setShowTrash(!showTrash)} title="Recycle Bin">
+              <Trash2 size={16} fill={showTrash ? 'currentColor' : 'none'} />
+            </button>
             <button className="btn-hexagon" onClick={() => setShowLayoutPanel(true)} title="Layout Settings"><Layout size={16} /></button>
             <button className="btn-hexagon" onClick={() => setShowSecurityPanel(true)} title="Security Settings"><Shield size={16} /></button>
             <button className="btn-hexagon" onClick={() => setShowAutomation(true)} title="Automation Rules"><Zap size={16} /></button>
@@ -873,7 +911,7 @@ function App() {
           <div className="note-list">
             {filteredNotes.length === 0 && (
               <div className="empty-state">
-                <p>{searchQuery ? 'No matching notes found.' : 'No notes yet. Create one!'}</p>
+                <p>{searchQuery ? 'No matching notes found.' : showTrash ? 'Trash is empty.' : 'No notes yet. Create one!'}</p>
               </div>
             )}
             {filteredNotes.map(note => (
@@ -886,6 +924,9 @@ function App() {
                 onTogglePin={handleTogglePin}
                 onToggleFavorite={handleToggleFavorite}
                 onToggleArchive={handleToggleArchive}
+                onDelete={removePage}
+                onRestore={restoreNote}
+                onPermanentDelete={permanentlyDelete}
               />
             ))}
           </div>
@@ -897,11 +938,13 @@ function App() {
           if (isMobile && isSidebarOpen) setIsSidebarOpen(false);
         }}
       >
-        {activeNoteForEditor ? (
+          {activeNoteForEditor ? (
           <NoteEditor 
             activeNote={activeNoteForEditor} 
             onUpdate={handleEditorUpdate} 
-            onDelete={removePage} 
+            onDelete={removePage}
+            onRestore={restoreNote}
+            onPermanentDelete={permanentlyDelete}
             onTogglePin={handleTogglePin} // Pass new handlers
             onToggleFavorite={handleToggleFavorite} // Pass new handlers
             onToggleArchive={handleToggleArchive}
@@ -997,7 +1040,7 @@ function App() {
         />
       )}
       </>
-      ) : <Login />}
+      ) : <Login onSkipLogin={handleSkipLogin} />}
     </div>
   )
 }

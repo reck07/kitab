@@ -1,5 +1,5 @@
 import { useRef, useEffect, useState } from 'react';
-import { List, Heading1, Heading2, MessageSquare, Mic, Share2, Lock, Pin, Star, Archive, X, ArrowLeft, Image as ImageIcon, Smile, Bot, SpellCheck, FileText, ChevronRight, CheckSquare, Layout } from 'lucide-react';
+import { List, Heading1, Heading2, MessageSquare, Mic, Share2, Lock, Pin, Star, Archive, X, ArrowLeft, Image as ImageIcon, Smile, Bot, SpellCheck, FileText, ChevronRight, CheckSquare, Layout, Trash2, RotateCcw } from 'lucide-react';
 import Tesseract from 'tesseract.js';
 import { PAPER_TYPES, CANVAS_SIZES, getPaperType } from './paperTypes';
 import { suggestTags } from './autoTag';
@@ -19,6 +19,9 @@ const NoteEditor = ({
   onTogglePin,
   onToggleFavorite,
   onToggleArchive,
+  onDelete,
+  onRestore,
+  onPermanentDelete,
   forwardLinks,
   backlinks,
   onNavigate,
@@ -331,20 +334,79 @@ const NoteEditor = ({
         </div>
       </div>
 
-      <div className="editor-container" style={{ 
+          <div className="editor-container" style={{ 
         maxWidth: '100%', 
         width: '100%',
         flex: 1,
         display: 'flex',
         flexDirection: 'column',
       }}>
+        <div className="editor-header-meta">
+          <div className="char-counter">{charCount}c · {wordCount}w · {readingTime}m</div>
+          <div className="note-meta">
+            {activeNote.isRecycled ? (
+              <>
+                <button className="btn-link" onClick={() => onRestore?.(activeNote.id)} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                  <RotateCcw size={14} /> Restore
+                </button>
+                <button className="btn-link danger" onClick={() => onPermanentDelete?.(activeNote.id)} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
+                  <Trash2 size={14} /> Delete
+                </button>
+              </>
+            ) : (
+              <>
+                <button className="btn-icon sm" onClick={() => onTogglePin?.(activeNote.id)} title={activeNote.isPinned ? 'Unpin' : 'Pin'} style={{ color: activeNote.isPinned ? 'var(--accent)' : undefined }}>
+                  <Pin size={12} fill={activeNote.isPinned ? 'currentColor' : 'none'} />
+                </button>
+                <button className="btn-icon sm" onClick={() => onToggleFavorite?.(activeNote.id)} title={activeNote.isFavorite ? 'Unfavorite' : 'Favorite'} style={{ color: activeNote.isFavorite ? 'var(--accent)' : undefined }}>
+                  <Star size={12} fill={activeNote.isFavorite ? 'currentColor' : 'none'} />
+                </button>
+                <button className="btn-icon sm" onClick={() => onToggleArchive?.(activeNote.id)} title={activeNote.isArchived ? 'Unarchive' : 'Archive'}>
+                  <Archive size={12} />
+                </button>
+                <button className="btn-icon sm" onClick={() => onDelete?.(activeNote.id)} title="Move to trash" style={{ color: 'var(--text-muted)' }}>
+                  <Trash2 size={12} />
+                </button>
+              </>
+            )}
+            {activeNote.isLocked && <Lock size={12} />}
+          </div>
+        </div>
+        {activeNote.isRecycled && (
+          <div className="trash-notice">
+            This note is in trash. <button className="btn-link" onClick={() => onRestore?.(activeNote.id)}>Restore</button> or <button className="btn-link danger" onClick={() => onPermanentDelete?.(activeNote.id)}>delete permanently</button>
+          </div>
+        )}
+        {!activeNote.isRecycled && (
+          <div className="tags-bar">
+            <div className="tags-display">
+              {activeNote.tags?.map(tag => (
+                <span key={tag} className="tag-badge">
+                  {tag}
+                  <button className="remove-tag-btn" onClick={() => handleRemoveTagClick(tag)}>×</button>
+                </span>
+              ))}
+              <input type="text" className="tag-input" placeholder="tag" onKeyDown={handleTagInput} />
+              <button className="btn-icon sm" onClick={() => {
+                const suggestions = suggestTags(activeNote);
+                suggestions.forEach(tag => {
+                  if (!activeNote.tags?.includes(tag)) {
+                    const updatedTags = [...(activeNote.tags || []), tag];
+                    onUpdate(activeNote.id, { tags: updatedTags });
+                  }
+                });
+                if (suggestions.length === 0) alert('No new tag suggestions found');
+              }} title="Auto-suggest tags">✨</button>
+            </div>
+          </div>
+        )}
         {activeNote.coverImage && (
-          <div className="note-cover-wrapper" style={{ marginBottom: '1.5rem', borderRadius: 'var(--radius)', overflow: 'hidden', position: 'relative' }}>
+          <div className="note-cover-wrapper" style={{ marginBottom: '0.75rem', borderRadius: 'var(--radius)', overflow: 'hidden', position: 'relative' }}>
             <img 
               src={activeNote.coverImage} 
               alt="Note cover" 
               className="note-cover-image"
-              style={{ width: '100%', height: '200px', objectFit: 'cover', display: 'block' }}
+              style={{ width: '100%', height: '160px', objectFit: 'cover', display: 'block' }}
             />
             <div className="cover-actions">
               <button className="btn-icon" onClick={handleCoverUpload} title="Change Cover"><ImageIcon size={16} /></button>
@@ -413,21 +475,6 @@ const NoteEditor = ({
         </div>
 
         <div className="editor-footer">
-          <div className="footer-meta">
-            <span className="char-counter">{charCount}c · {wordCount}w · {readingTime}m</span>
-            <div className="note-meta">
-              <button className="btn-icon sm" onClick={() => onTogglePin?.(activeNote.id)} title={activeNote.isPinned ? 'Unpin' : 'Pin'} style={{ color: activeNote.isPinned ? 'var(--accent)' : undefined }}>
-                <Pin size={12} fill={activeNote.isPinned ? 'currentColor' : 'none'} />
-              </button>
-              <button className="btn-icon sm" onClick={() => onToggleFavorite?.(activeNote.id)} title={activeNote.isFavorite ? 'Unfavorite' : 'Favorite'} style={{ color: activeNote.isFavorite ? 'var(--accent)' : undefined }}>
-                <Star size={12} fill={activeNote.isFavorite ? 'currentColor' : 'none'} />
-              </button>
-              <button className="btn-icon sm" onClick={() => onToggleArchive?.(activeNote.id)} title={activeNote.isArchived ? 'Unarchive' : 'Archive'}>
-                <Archive size={12} />
-              </button>
-              {activeNote.isLocked && <Lock size={12} />}
-            </div>
-          </div>
           {forwardLinks?.length > 0 && (
             <div className="links-bar" style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', padding: '4px 0', fontSize: '12px', color: 'var(--text-muted)' }}>
               <span>→</span>
@@ -448,25 +495,6 @@ const NoteEditor = ({
               ))}
             </div>
           )}
-          <div className="tags-display">
-            {activeNote.tags?.map(tag => (
-              <span key={tag} className="tag-badge">
-                {tag}
-                <button className="remove-tag-btn" onClick={() => handleRemoveTagClick(tag)}>×</button>
-              </span>
-            ))}
-            <input type="text" className="tag-input" placeholder="tag" onKeyDown={handleTagInput} />
-            <button className="btn-icon sm" onClick={() => {
-              const suggestions = suggestTags(activeNote);
-              suggestions.forEach(tag => {
-                if (!activeNote.tags?.includes(tag)) {
-                  const updatedTags = [...(activeNote.tags || []), tag];
-                  onUpdate(activeNote.id, { tags: updatedTags });
-                }
-              });
-              if (suggestions.length === 0) alert('No new tag suggestions found');
-            }} title="Auto-suggest tags">✨</button>
-          </div>
         </div>
 
         {showPaperSettings && (
