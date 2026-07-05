@@ -348,9 +348,15 @@ function App() {
     }
   };
 
-  const handleNoteSelect = (id) => {
+  const handleNoteSelect = async (id) => {
     const note = notes.find(n => n.id === id);
     if (!note) return;
+    if (isNoteLocked(note) && !unlockedContentById[id]) {
+      const password = window.prompt('Enter password to unlock this note');
+      if (!password) return;
+      const ok = await handleSecurityUnlock(id, password);
+      if (!ok) { alert('Incorrect password'); return; }
+    }
     setActiveNoteId(id);
     if (isMobile) { setIsEditorOpen(true); setIsSidebarOpen(false); }
   };
@@ -412,6 +418,7 @@ function App() {
             onLogin={clearGuestMode}
             onGoogleDriveSave={handleGoogleDriveSave}
             onToggleView={() => setShowViewSwitcher(!showViewSwitcher)}
+            onNewNote={addPage}
           />
 
           {showViewSwitcher && (
