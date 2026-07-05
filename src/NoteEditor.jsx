@@ -129,26 +129,41 @@ const NoteEditor = ({
   const handleVoiceInput = () => {
     const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
     if (!SpeechRecognition) {
-      alert("Voice input is not supported in this browser.");
+      alert("Voice input is not supported in this browser. Try Chrome or Edge.");
       return;
     }
 
-    const recognition = new SpeechRecognition();
-    recognition.lang = 'en-US';
-    recognition.continuous = false;
+    try {
+      const recognition = new SpeechRecognition();
+      recognition.lang = 'en-US';
+      recognition.continuous = false;
 
-    recognition.onstart = () => setIsRecording(true);
-    recognition.onend = () => setIsRecording(false);
-    
-    recognition.onresult = (event) => {
-      const transcript = event.results[0][0].transcript;
-      const currentHTML = editorRef.current.innerHTML;
-      const needsSpace = currentHTML.length > 0 && !currentHTML.endsWith(' ');
-      const updatedHTML = currentHTML + (needsSpace ? ' ' : '') + transcript;
-      onUpdate(activeNote.id, { content: updatedHTML });
-    };
+      recognition.onstart = () => setIsRecording(true);
+      recognition.onend = () => setIsRecording(false);
+      recognition.onerror = (event) => {
+        setIsRecording(false);
+        if (event.error === 'not-allowed') {
+          alert('Microphone access denied. Allow microphone permission in your browser settings.');
+        } else if (event.error === 'no-speech') {
+          alert('No speech detected. Try speaking louder or check your microphone.');
+        } else {
+          alert('Voice input error: ' + event.error);
+        }
+      };
+      
+      recognition.onresult = (event) => {
+        const transcript = event.results[0][0].transcript;
+        const currentHTML = editorRef.current.innerHTML;
+        const needsSpace = currentHTML.length > 0 && !currentHTML.endsWith(' ');
+        const updatedHTML = currentHTML + (needsSpace ? ' ' : '') + transcript;
+        onUpdate(activeNote.id, { content: updatedHTML });
+      };
 
-    recognition.start();
+      recognition.start();
+    } catch (e) {
+      setIsRecording(false);
+      alert('Voice input failed to start: ' + e.message);
+    }
   };
 
   const handleShare = async () => {
@@ -308,14 +323,14 @@ const NoteEditor = ({
             <option value="19px">19</option>
             <option value="21px">21</option>
           </select>
-          <button className="btn-icon sm" onClick={() => document.execCommand('bold')} title="Bold"><strong>B</strong></button>
-          <button className="btn-icon sm" onClick={() => document.execCommand('italic')} title="Italic"><em>i</em></button>
-          <button className="btn-icon sm" onClick={() => document.execCommand('insertUnorderedList')} title="Bullet List"><List size={15} /></button>
-          <button className="btn-icon sm" onClick={() => document.execCommand('insertOrderedList')} title="Numbered List"><CheckSquare size={15} /></button>
-          <button className="btn-icon sm" onClick={() => document.execCommand('formatBlock', false, 'h1')} title="Heading 1"><Heading1 size={15} /></button>
-          <button className="btn-icon sm" onClick={() => document.execCommand('formatBlock', false, 'h2')} title="Heading 2"><Heading2 size={15} /></button>
-          <button className="btn-icon sm" onClick={() => document.execCommand('formatBlock', false, 'blockquote')} title="Quote"><MessageSquare size={15} /></button>
-          <button className="btn-icon sm" onClick={() => document.execCommand('insertHorizontalRule')} title="Divider">—</button>
+          <button className="btn-icon sm" onClick={() => { editorRef.current?.focus(); document.execCommand('bold'); }} title="Bold"><strong>B</strong></button>
+          <button className="btn-icon sm" onClick={() => { editorRef.current?.focus(); document.execCommand('italic'); }} title="Italic"><em>i</em></button>
+          <button className="btn-icon sm" onClick={() => { editorRef.current?.focus(); document.execCommand('insertUnorderedList'); }} title="Bullet List"><List size={15} /></button>
+          <button className="btn-icon sm" onClick={() => { editorRef.current?.focus(); document.execCommand('insertOrderedList'); }} title="Numbered List"><CheckSquare size={15} /></button>
+          <button className="btn-icon sm" onClick={() => { editorRef.current?.focus(); document.execCommand('formatBlock', false, 'h1'); editorRef.current?.focus(); }} title="Heading 1"><Heading1 size={15} /></button>
+          <button className="btn-icon sm" onClick={() => { editorRef.current?.focus(); document.execCommand('formatBlock', false, 'h2'); editorRef.current?.focus(); }} title="Heading 2"><Heading2 size={15} /></button>
+          <button className="btn-icon sm" onClick={() => { editorRef.current?.focus(); document.execCommand('formatBlock', false, 'blockquote'); }} title="Quote"><MessageSquare size={15} /></button>
+          <button className="btn-icon sm" onClick={() => { editorRef.current?.focus(); document.execCommand('insertHorizontalRule'); }} title="Divider">—</button>
           <div className="toolbar-divider"></div>
           <button className="btn-icon sm" onClick={handleVoiceInput} title="Voice Input" style={{ color: isRecording ? 'var(--danger)' : 'var(--text-muted)' }}><Mic size={15} /></button>
           <button className="btn-icon sm" onClick={handleShare} title="Share"><Share2 size={15} /></button>
@@ -333,6 +348,19 @@ const NoteEditor = ({
           {isScanningImage && <span className="scan-badge">📸</span>}
         </div>
       </div>
+
+        {showEmojiPicker && (
+          <div className="emoji-picker">
+            {['😀','😁','😂','🤣','😃','😄','😅','😆','😉','😊','😋','😎','😍','🥰','😘','😜','😝','😤','😢','😭','😱','🤔','🤗','👋','👍','👎','👏','🙌','💪','🔥','⭐','❤️','💔','💯','✅','❌','📝','💡','🎨','🚀','📌','🎯','🔒','🔓','📁','📂','📎','🔗','💾','📷','🎤','🔊','📢','💬','🗨️','✏️','📖','🔍','⚡','🔄','📋','📊','🎵','🎶','🌟','💫','✨','🕐','📅','📍','🏷️','📦','🎁','🏆','🥇','🧠','👁️','💎','🧩','🎮','📱','💻','🖥️','🖨️','🔧','⚙️','🔩','🧪','📡','🌐','🔑','🛡️','📈','📉','📰','🗞️','📄','📃','📑','📊','🗂️','📁','📂','📌','📎','🔗','🔒','🔓','🔐','🔑','🛡️','💻','🖥️','📱','📷','🎥','🎬','🎤','🎧','🎵','🎶','🎼','🎹','🎸','🎺','🎻','🥁','🎨','🎭','🎪','🎤','📝','✏️','🖊️','🖋️','✒️','📄','📃','📑','📊','📈','📉','📋','📅','📆','📁','📂','🗂️','📇','📌','📎','🔗','🔒','🔓','🔐','🔑','🛡️','💡','🔦','🔋','🔌','💻','🖥️','🖨️','⌨️','🖱️','🖲️','🕹️','💾','💿','📀','🎥','📷','📸','📹','🎥','📽️','🎞️','🔍','🔎','🔬','🔭','📡','🌐','🌍','🌏','🌎','🗺️','🗾','🌋','🏔️','🏠','🏡','🏢','🏣','🏤','🏥','🏦','🏨','🏩','🏪','🏫','🏬','🏭','🏮','🏯','🏰','💒','🗼','🗽','⛪','🕌','🛕','🕍','⛩️','🕋','⛲','⛺','🌁','🌃','🏙️','🌄','🌅','🌆','🌇','🌉','🌌','🏞️','🏟️','🏛️','🏗️','🏘️','🏚️','🏠','🏡','🏢','🏣','🏤','🏥','🏦','🏨','🏩','🏪','🏫','🏬','🏭','🏮','🏯','🏰','💒','🗼','🗽','⛪','🕌','🛕','🕍','⛩️','🕋'] .map(emoji => (
+              <button key={emoji} className="emoji-btn" onClick={() => {
+                editorRef.current?.focus();
+                document.execCommand('insertText', false, emoji);
+                onUpdate(activeNote.id, { content: editorRef.current?.innerHTML || activeNote.content });
+                setShowEmojiPicker(false);
+              }}>{emoji}</button>
+            ))}
+          </div>
+        )}
 
           <div className="editor-container" style={{ 
         maxWidth: '100%', 

@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { X, Lock, Shield, Key, Fingerprint, Eye, EyeOff, Timer } from 'lucide-react';
+import { useState, useEffect } from 'react';
+import { X, Lock, Shield, Key, Fingerprint, Eye, EyeOff, Timer, Info } from 'lucide-react';
 import { isNoteLocked } from './crypto';
 import { isWebAuthnAvailable, registerBiometric, authenticateBiometric } from './webauthn';
 
@@ -8,6 +8,11 @@ const SecurityPanel = ({ onClose, notes, activeNoteId, onLockNote, onUnlockNote,
   const [passwordInput, setPasswordInput] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [passwordError, setPasswordError] = useState('');
+  const [webAuthnAvail, setWebAuthnAvail] = useState(null);
+
+  useEffect(() => {
+    isWebAuthnAvailable().then(setWebAuthnAvail);
+  }, []);
 
   if (!activeNote) return null;
 
@@ -82,26 +87,30 @@ const SecurityPanel = ({ onClose, notes, activeNoteId, onLockNote, onUnlockNote,
           <section className="settings-section">
             <h4><Fingerprint size={16} /> Biometric Lock</h4>
             <div className="setting-row">
-              <label className="toggle-label">
-                <input type="checkbox" checked={biometricEnabled} onChange={async (e) => {
-                  if (e.target.checked) {
-                    try {
-                      const avail = await isWebAuthnAvailable();
-                      if (!avail) { alert('Biometric authentication is not available on this device'); return; }
-                      await registerBiometric();
-                      onBiometricToggle(true);
-                      alert('Biometric registered successfully');
-                    } catch (err) {
-                      alert('Biometric registration failed: ' + err.message);
+              {webAuthnAvail === false ? (
+                <div className="biometric-unavailable">
+                  <Info size={16} />
+                  <span>Biometric (WebAuthn) is not available on this device. Requires HTTPS and a device with fingerprint or face unlock.</span>
+                </div>
+              ) : (
+                <label className="toggle-label">
+                  <input type="checkbox" checked={biometricEnabled} onChange={async (e) => {
+                    if (e.target.checked) {
+                      try {
+                        await registerBiometric();
+                        onBiometricToggle(true);
+                      } catch (err) {
+                        alert('Biometric registration failed: ' + err.message);
+                      }
+                    } else {
+                      localStorage.removeItem('webauthn_credential');
+                      onBiometricToggle(false);
                     }
-                  } else {
-                    localStorage.removeItem('webauthn_credential');
-                    onBiometricToggle(false);
-                  }
-                }} />
-                <span className="toggle-switch" />
-                <span>Use biometric authentication</span>
-              </label>
+                  }} />
+                  <span className="toggle-switch" />
+                  <span>Use biometric authentication</span>
+                </label>
+              )}
               <p className="setting-hint">Requires device with fingerprint or face unlock support</p>
             </div>
           </section>

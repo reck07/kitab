@@ -489,6 +489,39 @@ body {
   margin-bottom: 1rem;
 }
 
+.emoji-picker {
+  position: fixed;
+  bottom: 90px;
+  right: 24px;
+  z-index: 100;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 8px;
+  box-shadow: var(--shadow);
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 2px;
+  max-height: 240px;
+  overflow-y: auto;
+  width: 280px;
+}
+
+.emoji-btn {
+  background: none;
+  border: none;
+  font-size: 20px;
+  cursor: pointer;
+  padding: 4px;
+  border-radius: 4px;
+  transition: background 0.15s;
+  text-align: center;
+}
+
+.emoji-btn:hover {
+  background: var(--bg-active);
+}
+
 .note.digital-paper h2 {
   font-size: 1.75rem;
   font-weight: 700;
@@ -1099,6 +1132,19 @@ body {
   align-items: center;
   gap: 12px;
   margin-bottom: 8px;
+}
+
+.biometric-unavailable {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  padding: 10px 12px;
+  background: rgba(239, 68, 68, 0.08);
+  border: 1px solid rgba(239, 68, 68, 0.2);
+  border-radius: var(--radius);
+  font-size: 12px;
+  color: var(--text-muted);
+  line-height: 1.4;
 }
 
 .setting-row select {
