@@ -1,22 +1,22 @@
-import { useState, useEffect, useRef, useMemo } from 'react'
-<<<<<<< HEAD
-import { supabase, isSupabaseConfigured } from './supabaseClient'
-=======
+import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { supabase } from './supabaseClient'
->>>>>>> b95ce7254a8b813cef834ed02a8364210c343079
 import './App.css'
 import Navbar from './Navbar'
+import Login from './Login'
 import NoteCard from './NoteCard'
 import NoteEditor from './NoteEditor'
-import { Plus, Star, Archive, Network, X, Calculator as CalculatorIcon, Pencil } from 'lucide-react'
+import { Star, Archive, X, Palette, Layout, Shield, QrCode, Zap } from 'lucide-react'
 import { isNoteLocked, encryptNoteContent, decryptNoteContent } from './crypto'
 import Calculator from './Calculator'
 import DrawingPad from './DrawingPad'
-<<<<<<< HEAD
-import Auth from './Auth'
-import { testSupabaseConnection } from './lib/supabaseHealth'
-=======
->>>>>>> b95ce7254a8b813cef834ed02a8364210c343079
+import FloatingMenu from './FloatingMenu'
+import SettingsPanel from './SettingsPanel'
+import LayoutPanel from './LayoutPanel'
+import SecurityPanel from './SecurityPanel'
+import QrCodeModal from './QrCodeModal'
+import AutomationPanel from './AutomationPanel'
+import { evaluateRules, applyActions } from './automationRules'
+import { DEFAULT_NOTE_CONFIG, THEME_PRESETS } from './paperTypes'
 
 const getGreeting = () => {
   const hour = new Date().getHours();
@@ -54,17 +54,33 @@ const generateDefaultNote = (userId = null) => ({
   isArchived: false,
   tags: ['ui', 'design', 'welcome'],
   folder: 'Design Notes',
-  paperStyle: 'ruled',
-  fontSize: '17px',
+  paperStyle: DEFAULT_NOTE_CONFIG.paperType,
+  canvasSize: DEFAULT_NOTE_CONFIG.canvasSize,
+  fontSize: `${DEFAULT_NOTE_CONFIG.fontSize}px`,
   coverImage: 'https://images.unsplash.com/photo-1618005182384-a83a8bd57fbe?q=80&w=2564&auto=format&fit=crop',
+  coverMaterial: DEFAULT_NOTE_CONFIG.coverMaterial,
+  bindingType: DEFAULT_NOTE_CONFIG.bindingType,
+  paperWeight: DEFAULT_NOTE_CONFIG.paperWeight,
+  paperFinish: DEFAULT_NOTE_CONFIG.paperFinish,
+  pageCount: DEFAULT_NOTE_CONFIG.pageCount,
   user_id: userId,
   created_at: new Date().toISOString(),
   updated_at: new Date().toISOString()
 });
 
 const GraphView = ({ notes, unlockedContentById, activeNoteId, onNavigate, onClose }) => {
-  const edges = [];
+  const edges = new Map();
   const nodes = notes.map(n => ({ id: n.id, title: n.title || 'Untitled' }));
+  const svgRef = useRef(null);
+  const [viewBox, setViewBox] = useState({ x: 0, y: 0, w: 800, h: 500 });
+  const dragRef = useRef(null);
+
+  const addEdge = (source, target, type) => {
+    const key = [source, target].sort().join('-');
+    if (!edges.has(key)) {
+      edges.set(key, { source, target, type });
+    }
+  };
 
   notes.forEach(note => {
     const content = (isNoteLocked(note) ? unlockedContentById[note.id] : note.content) || '';
@@ -72,7 +88,16 @@ const GraphView = ({ notes, unlockedContentById, activeNoteId, onNavigate, onClo
     matches.forEach(m => {
       const targetTitle = m[1].toLowerCase();
       const targetNote = notes.find(n => n.id !== note.id && n.title?.toLowerCase() === targetTitle);
-      if (targetNote) edges.push({ source: note.id, target: targetNote.id });
+      if (targetNote) addEdge(note.id, targetNote.id, 'explicit');
+    });
+  });
+
+  notes.forEach((noteA, i) => {
+    notes.slice(i + 1).forEach(noteB => {
+      const sharedTags = noteA.tags?.filter(tag => noteB.tags?.includes(tag));
+      if (sharedTags && sharedTags.length > 0) {
+        addEdge(noteA.id, noteB.id, 'implicit');
+      }
     });
   });
 
@@ -91,26 +116,52 @@ const GraphView = ({ notes, unlockedContentById, activeNoteId, onNavigate, onClo
     }
   });
 
+  const handleWheel = (e) => {
+    e.preventDefault();
+    const factor = e.deltaY > 0 ? 1.1 : 0.9;
+    setViewBox(v => {
+      const nw = Math.max(200, v.w * factor);
+      const nh = nw * (height / width);
+      const nx = v.x - (nw - v.w) / 2;
+      const ny = v.y - (nh - v.h) / 2;
+      return { x: nx, y: ny, w: nw, h: nh };
+    });
+  };
+
+  const handleMouseDown = (e) => {
+    dragRef.current = { x: e.clientX, y: e.clientY, vx: viewBox.x, vy: viewBox.y };
+  };
+
+  const handleMouseMove = (e) => {
+    if (!dragRef.current) return;
+    const dx = e.clientX - dragRef.current.x;
+    const dy = e.clientY - dragRef.current.y;
+    setViewBox(v => ({ ...v, x: dragRef.current.vx - dx * (v.w / svgRef.current?.clientWidth), y: dragRef.current.vy - dy * (v.h / svgRef.current?.clientHeight) }));
+  };
+
+  const handleMouseUp = () => { dragRef.current = null; };
+
   return (
     <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 999, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(4px)' }} onClick={onClose}>
       <div onClick={e => e.stopPropagation()} style={{ background: 'var(--bg-app)', borderRadius: 'var(--radius)', padding: '24px', width: '90%', maxWidth: '850px', boxShadow: 'var(--shadow)', border: '1px solid var(--border)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px', alignItems: 'center' }}>
-          <h3 style={{ margin: 0 }}>Knowledge Graph</h3>
+          <h3 style={{ margin: 0 }}>Knowledge Graph <span style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 400 }}>scroll to zoom · drag to pan</span></h3>
           <button className="btn-icon" onClick={onClose}><X size={18} /></button>
         </div>
-        <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', overflow: 'hidden', height: '500px', position: 'relative' }}>
-          <svg width="100%" height="100%" viewBox={`0 0 ${width} ${height}`}>
-             {edges.map((e, i) => {
+        <div style={{ background: 'var(--bg-card)', border: '1px solid var(--border)', borderRadius: 'var(--radius)', overflow: 'hidden', height: '500px', position: 'relative', cursor: 'grab' }}>
+          <svg ref={svgRef} width="100%" height="100%" viewBox={`${viewBox.x} ${viewBox.y} ${viewBox.w} ${viewBox.h}`} onWheel={handleWheel} onMouseDown={handleMouseDown} onMouseMove={handleMouseMove} onMouseUp={handleMouseUp} onMouseLeave={handleMouseUp}>
+             {Array.from(edges.values()).map((e, i) => {
                const src = nodePositions[e.source]; const tgt = nodePositions[e.target];
                if (!src || !tgt) return null;
-               return <line key={i} x1={src.x} y1={src.y} x2={tgt.x} y2={tgt.y} stroke="var(--text-muted)" strokeWidth="1.5" opacity="0.3" />
+               const isImplicit = e.type === 'implicit';
+               return <line key={i} x1={src.x} y1={src.y} x2={tgt.x} y2={tgt.y} stroke="var(--text-muted)" strokeWidth={isImplicit ? 1 : 1.5} opacity={isImplicit ? 0.2 : 0.4} strokeDasharray={isImplicit ? '4 4' : 'none'} />
              })}
              {nodes.map(n => {
                const pos = nodePositions[n.id];
                if (!pos) return null;
                const isActive = n.id === activeNoteId;
                return (
-                 <g key={n.id} transform={`translate(${pos.x}, ${pos.y})`} style={{ cursor: 'pointer', transition: 'all 0.2s' }} onClick={() => { onNavigate(n.id); onClose(); }}>
+                 <g key={n.id} transform={`translate(${pos.x}, ${pos.y})`} style={{ cursor: 'pointer' }} onClick={() => { onNavigate(n.id); onClose(); }}>
                    <circle r={isActive ? 14 : 8} fill={isActive ? 'var(--accent)' : 'var(--bg-main)'} stroke={isActive ? 'var(--bg-app)' : 'var(--accent)'} strokeWidth="3" />
                    <text y={isActive ? 28 : 22} textAnchor="middle" fontSize={isActive ? '12px' : '10px'} fill="var(--text-main)" fontWeight={isActive ? '700' : '500'}>{n.title}</text>
                  </g>
@@ -123,56 +174,10 @@ const GraphView = ({ notes, unlockedContentById, activeNoteId, onNavigate, onClo
   );
 };
 
-const FloatingMenu = ({ onAdd, onGraph, onExportJSON, onExportPDF, onCalculator, onDrawingPad }) => {
-  const [isOpen, setIsOpen] = useState(false);
-
-  return (
-    <div className={`fab-container ${isOpen ? 'open' : ''}`}>
-      <div className="fab-items-wrapper">
-        <button className="fab-item" onClick={() => { onExportPDF(); setIsOpen(false); }} title="Print / Export PDF">
-          <span style={{ fontSize: '18px' }}>📄</span>
-        </button>
-        <button className="fab-item" onClick={() => { onExportJSON(); setIsOpen(false); }} title="Export Backup (JSON)">
-          <span style={{ fontSize: '18px' }}>📦</span>
-        </button>
-        <button className="fab-item" onClick={() => { onGraph(); setIsOpen(false); }} title="Knowledge Graph">
-          <Network size={20} />
-        </button>
-        <button className="fab-item" onClick={() => { onDrawingPad(); setIsOpen(false); }} title="Mini Sketch Pad">
-          <Pencil size={20} />
-        </button>
-        <button className="fab-item" onClick={() => { onCalculator(); setIsOpen(false); }} title="Floating Calculator">
-          <CalculatorIcon size={20} />
-        </button>
-        <button className="fab-item" onClick={() => { onAdd(); setIsOpen(false); }} title="New Note">
-          <Plus size={20} />
-        </button>
-      </div>
-      <button className="fab-toggle" onClick={() => setIsOpen(!isOpen)} title="Menu">
-        <div className="fab-hamburger">
-          <span></span>
-          <span></span>
-          <span></span>
-        </div>
-      </button>
-    </div>
-  );
-};
-
 function App() {
-<<<<<<< HEAD
-  const hasSupabase = isSupabaseConfigured && Boolean(supabase);
-=======
-  const hasSupabase = Boolean(supabase);
->>>>>>> b95ce7254a8b813cef834ed02a8364210c343079
-  const [notes, setNotes] = useState(() => {
-    const local = JSON.parse(localStorage.getItem('notes') || '[]');
-    if (local.length > 0) return local;
-    const defaultNote = generateDefaultNote();
-    localStorage.setItem('notes', JSON.stringify([defaultNote]));
-    return [defaultNote];
-  });
+  const [notes, setNotes] = useState(() => JSON.parse(localStorage.getItem('notes') || '[]'));
   const [user, setUser] = useState(null);
+  const [authLoading, setAuthLoading] = useState(true);
   const [activeNoteId, setActiveNoteId] = useState(() => {
     const localNotes = JSON.parse(localStorage.getItem('notes') || '[]');
     return localNotes.length > 0 ? localNotes[0].id : null;
@@ -181,6 +186,7 @@ function App() {
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isEditorOpen, setIsEditorOpen] = useState(window.innerWidth >= 768);
   const [searchQuery, setSearchQuery] = useState('');
+  const debounceRef = useRef(null);
   const [showFavorites, setShowFavorites] = useState(false); // New state for favorites filter
   const [sortOrder, setSortOrder] = useState('latest');
   const [selectedTag, setSelectedTag] = useState(null);
@@ -196,64 +202,30 @@ function App() {
   const [showGraph, setShowGraph] = useState(false);
   const [showCalculator, setShowCalculator] = useState(false);
   const [showDrawingPad, setShowDrawingPad] = useState(false);
-<<<<<<< HEAD
-  const [showAuth, setShowAuth] = useState(false);
-  const [dbStatus, setDbStatus] = useState('checking');
+  const [showSettings, setShowSettings] = useState(false);
+  const [showLayoutPanel, setShowLayoutPanel] = useState(false);
+  const [showSecurityPanel, setShowSecurityPanel] = useState(false);
+  const [biometricEnabled, setBiometricEnabled] = useState(false);
+  const [autoLockTimeout, setAutoLockTimeout] = useState(5);
+  const [showQrCode, setShowQrCode] = useState(false);
+  const [showAutomation, setShowAutomation] = useState(false);
+  const [focusMode, setFocusMode] = useState(false);
+  const [offline, setOffline] = useState(!navigator.onLine);
+  const editorActionsRef = useRef(null);
 
-  async function fetchNotes(userId) {
-    if (!supabase) return;
-=======
-
+  const [isSortDropdownVisible, setIsSortDropdownVisible] = useState(false);
   async function fetchNotes(userId) {
     if (!supabase) {
       return;
     }
->>>>>>> b95ce7254a8b813cef834ed02a8364210c343079
 
-    const { data, error } = await supabase
+    const { data } = await supabase
       .from('notes')
       .select('*')
       .eq('user_id', userId)
       .order('isPinned', { ascending: false })
       .order('updated_at', { ascending: false });
 
-<<<<<<< HEAD
-    if (error) {
-      console.error('fetchNotes error:', error);
-      if (error.code === '42P01' || error.message?.includes('does not exist')) {
-        setDbStatus('missing_table');
-      } else {
-        setDbStatus('error');
-      }
-      return;
-    }
-
-    if (data && data.length > 0) {
-      setNotes(data);
-      localStorage.setItem('notes', JSON.stringify(data));
-      setActiveNoteId((prev) => (data.some((n) => n.id === prev) ? prev : data[0].id));
-      setDbStatus('connected');
-      return;
-    }
-
-    const localNotes = JSON.parse(localStorage.getItem('notes') || '[]');
-    if (localNotes.length > 0) {
-      const migrated = localNotes.map((n) => ({ ...n, user_id: userId }));
-      setNotes(migrated);
-      setActiveNoteId(migrated[0].id);
-      localStorage.setItem('notes', JSON.stringify(migrated));
-      await Promise.all(
-        migrated.map((n) => supabase.from('notes').upsert({ ...n, user_id: userId }))
-      );
-    } else {
-      const defaultNote = generateDefaultNote(userId);
-      setNotes([defaultNote]);
-      setActiveNoteId(defaultNote.id);
-      localStorage.setItem('notes', JSON.stringify([defaultNote]));
-      await supabase.from('notes').upsert({ ...defaultNote, user_id: userId });
-    }
-    setDbStatus('connected');
-=======
     if (data && data.length > 0) {
       setNotes(data);
       localStorage.setItem('notes', JSON.stringify(data));
@@ -270,92 +242,74 @@ function App() {
         supabase.from('notes').upsert(defaultNote).then();
       }
     }
->>>>>>> b95ce7254a8b813cef834ed02a8364210c343079
   }
 
   useEffect(() => {
     if (!supabase) {
-<<<<<<< HEAD
-      setDbStatus('unconfigured');
-      return undefined;
-    }
-
-    const checkDb = async () => {
-      const ping = await testSupabaseConnection();
-      if (!ping.ok) {
-        setDbStatus(ping.code === 'unconfigured' ? 'unconfigured' : 'error');
-        return;
-      }
-      try {
-        const { error } = await supabase.from('notes').select('id').limit(1);
-        if (error?.code === '42P01') {
-          setDbStatus('missing_table');
-          return;
-        }
-        if (error) throw error;
-        setDbStatus('connected');
-      } catch (err) {
-        console.error('Supabase DB error:', err);
-        setDbStatus('error');
-      }
-    };
-    checkDb();
-
-=======
+      setAuthLoading(false);
       return undefined;
     }
 
     // Handle Auth Session
->>>>>>> b95ce7254a8b813cef834ed02a8364210c343079
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
       if (session?.user) fetchNotes(session.user.id);
+      setAuthLoading(false);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
       setUser(session?.user ?? null);
-<<<<<<< HEAD
       if (session?.user) {
         fetchNotes(session.user.id);
       } else {
-        const localNotes = JSON.parse(localStorage.getItem('notes') || '[]');
-        setNotes(localNotes.length > 0 ? localNotes : [generateDefaultNote()]);
-        setActiveNoteId(localNotes[0]?.id ?? null);
+        setNotes([]);
+        localStorage.removeItem('notes');
+        setActiveNoteId(null);
       }
-=======
-      if (session?.user) fetchNotes(session.user.id);
->>>>>>> b95ce7254a8b813cef834ed02a8364210c343079
     });
 
     return () => subscription.unsubscribe();
   }, []);
 
-<<<<<<< HEAD
-  // Real-time sync when logged in (second tab / device updates)
+  // Online/offline detection
   useEffect(() => {
-    if (!supabase || !user?.id) return undefined;
-
-    const channel = supabase
-      .channel(`notes-${user.id}`)
-      .on(
-        'postgres_changes',
-        { event: '*', schema: 'public', table: 'notes', filter: `user_id=eq.${user.id}` },
-        () => {
-          fetchNotes(user.id);
-        }
-      )
-      .subscribe();
-
+    const handleOnline = () => setOffline(false);
+    const handleOffline = () => setOffline(true);
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
     return () => {
-      supabase.removeChannel(channel);
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
     };
-  }, [user?.id]);
+  }, []);
 
-=======
->>>>>>> b95ce7254a8b813cef834ed02a8364210c343079
-  // Update theme attribute
+  const handleSignOut = async () => {
+    await supabase.auth.signOut();
+    setUser(null);
+    setNotes([]);
+    localStorage.removeItem('notes');
+    setActiveNoteId(null);
+  };
+
+  // Update theme attribute and CSS variables
   useEffect(() => {
-    document.documentElement.setAttribute('data-theme', theme);
+    const root = document.documentElement;
+    root.setAttribute('data-theme', theme);
+    const preset = THEME_PRESETS[theme];
+    if (preset) {
+      root.style.setProperty('--bg-app', preset.bg);
+      root.style.setProperty('--bg-main', preset.bg);
+      root.style.setProperty('--bg-glass', `${preset.bg}d9`);
+      root.style.setProperty('--bg-sidebar', preset.bgCard);
+      root.style.setProperty('--bg-card', preset.bgCard);
+      root.style.setProperty('--bg-card-hover', preset.bgMain);
+      root.style.setProperty('--bg-active', preset.bgMain);
+      root.style.setProperty('--text-main', preset.text);
+      root.style.setProperty('--text-muted', preset.textMuted);
+      root.style.setProperty('--border', preset.border);
+      root.style.setProperty('--accent', preset.accent);
+      root.style.setProperty('--accent-hover', preset.accent);
+    }
   }, [theme]);
 
   // Handle mobile responsiveness
@@ -407,13 +361,22 @@ function App() {
     // 2. Debounce the remote sync
     if (saveTimeoutsRef.current[id]) clearTimeout(saveTimeoutsRef.current[id]);
     saveTimeoutsRef.current[id] = setTimeout(async () => {
-      const currentNotes = notesRef.current;
-      const latestNote = currentNotes.find(n => n.id === id);
+      let currentNotes = notesRef.current;
+      let latestNote = currentNotes.find(n => n.id === id);
       if (!latestNote) return;
+
+      // Evaluate automation rules on update
+      const onUpdateActions = evaluateRules(latestNote, 'onUpdate', currentNotes);
+      if (onUpdateActions.length > 0) {
+        const processed = applyActions(latestNote, onUpdateActions);
+        currentNotes = currentNotes.map(n => n.id === id ? processed : n);
+        latestNote = processed;
+        setNotes(currentNotes);
+      }
 
       localStorage.setItem('notes', JSON.stringify(currentNotes));
       if (userRef.current && supabase) {
-        supabase.from('notes').upsert({ ...latestNote, user_id: userRef.current.id }).then(() => triggerSavedIndicator());
+        supabase.from('notes').upsert({ ...latestNote, user_id: userRef.current.id }).then(() => triggerSavedIndicator()).catch(() => triggerSavedIndicator());
       } else {
         triggerSavedIndicator();
       }
@@ -421,6 +384,12 @@ function App() {
   };
 
   const addPage = async () => {
+    if (notes.length === 0) {
+      const defaultNote = generateDefaultNote(user?.id);
+      setNotes([defaultNote]);
+      setActiveNoteId(defaultNote.id);
+      return;
+    }
     const newNote = { 
       id: Date.now(), 
       title: 'Untitled Note',
@@ -438,6 +407,11 @@ function App() {
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString() 
     };
+    // Evaluate automation rules on create
+    const actions = evaluateRules(newNote, 'onCreate', notes);
+    const processedNote = actions.length > 0 ? applyActions(newNote, actions) : newNote;
+    if (actions.length > 0) Object.assign(newNote, processedNote);
+    
     if (user && supabase) await supabase.from('notes').insert(newNote);
     
     const updated = [newNote, ...notes];
@@ -467,7 +441,12 @@ function App() {
     }
   };
 
-  const exportJSON = () => {
+  const exportPDF = () => {
+    if (!activeNote) return;
+    window.print();
+  };
+
+  function exportJSON() {
     const dataStr = JSON.stringify(notes, null, 2);
     const dataBlob = new Blob([dataStr], { type: 'application/json' });
     const url = URL.createObjectURL(dataBlob);
@@ -504,19 +483,6 @@ function App() {
     }
   };
 
-  const exportPDF = () => {
-    if (!activeNote) return;
-<<<<<<< HEAD
-    try {
-      window.print();
-    } catch (e) {
-      alert('Printing/PDF export is not natively supported on this device.');
-    }
-=======
-    window.print();
->>>>>>> b95ce7254a8b813cef834ed02a8364210c343079
-  };
-
   const handleRemoveTag = (noteId, tagToRemove) => {
     const updatedNotes = notes.map(n =>
       n.id === noteId ? { ...n, tags: n.tags?.filter(t => t !== tagToRemove) || [], updated_at: new Date().toISOString() } : n
@@ -548,9 +514,11 @@ function App() {
   const filteredNotes = useMemo(() => {
     const filtered = notes.filter(n => {
       const searchableContent = isNoteLocked(n) ? '' : (n.content || '');
-      const matchesSearch = 
+      const matchesSearch = !searchQuery || 
         n.title?.toLowerCase().includes(searchQuery.toLowerCase()) || 
-        searchableContent.toLowerCase().includes(searchQuery.toLowerCase());
+        searchableContent.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        n.tags?.some(t => t.toLowerCase().includes(searchQuery.toLowerCase())) ||
+        (n.folder || '').toLowerCase().includes(searchQuery.toLowerCase());
       const matchesTag = !selectedTag || n.tags?.includes(selectedTag);
       const matchesFavorites = !showFavorites || n.isFavorite; // Filter by favorites
       const matchesArchive = showArchived ? n.isArchived : !n.isArchived;
@@ -579,9 +547,9 @@ function App() {
   const activeNoteVisibleContent = isActiveNoteLocked
     ? (unlockedContentById[activeNote.id] || '')
     : (activeNote?.content || '');
-  const activeNoteForEditor = activeNote
+  const activeNoteForEditor = useMemo(() => activeNote
     ? { ...activeNote, content: activeNoteVisibleContent, isLocked: isActiveNoteLocked }
-    : null;
+    : null, [activeNote, activeNoteVisibleContent, isActiveNoteLocked]);
 
   // Bi-directional Linking calculations
   const forwardLinks = useMemo(() => {
@@ -668,6 +636,41 @@ function App() {
     alert('Note locked successfully');
   };
 
+  const handleSecurityLock = useCallback(async (id, password) => {
+    const note = notesRef.current.find(n => n.id === id);
+    if (!note) return;
+    const encryptedContent = await encryptNoteContent(note.content || '', password);
+    debouncedUpdate(id, { content: encryptedContent });
+    setUnlockedContentById(prev => {
+      const next = { ...prev };
+      delete next[id];
+      return next;
+    });
+    setNotePasswordsById(prev => ({ ...prev, [id]: password }));
+  }, []);
+
+  const handleSecurityUnlock = useCallback(async (id, password) => {
+    const note = notesRef.current.find(n => n.id === id);
+    if (!note) return false;
+    try {
+      const decryptedContent = await decryptNoteContent(note.content, password);
+      debouncedUpdate(id, { content: decryptedContent });
+      setUnlockedContentById(prev => {
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
+      setNotePasswordsById(prev => {
+        const next = { ...prev };
+        delete next[id];
+        return next;
+      });
+      return true;
+    } catch {
+      return false;
+    }
+  }, []);
+
   const handleEditorUpdate = async (id, updatedFields) => {
     const note = notes.find((n) => n.id === id);
     if (!note) return;
@@ -706,7 +709,7 @@ function App() {
       setNotes(updatedNotes);
       localStorage.setItem('notes', JSON.stringify(updatedNotes));
       if (userRef.current && supabase) {
-        supabase.from('notes').upsert({ ...noteToSave, user_id: userRef.current.id }).then(() => triggerSavedIndicator());
+        supabase.from('notes').upsert({ ...noteToSave, user_id: userRef.current.id }).then(() => triggerSavedIndicator()).catch(() => triggerSavedIndicator());
       } else {
         triggerSavedIndicator();
       }
@@ -749,38 +752,47 @@ function App() {
   const showSidebar = isSidebarOpen;
   const showEditor = isMobile ? isEditorOpen : true;
 
-<<<<<<< HEAD
-  const handleLogout = async () => {
-    if (supabase) {
-      await supabase.auth.signOut();
+  const handleFabAction = useCallback((action) => {
+    switch (action) {
+      case 'bold': document.execCommand('bold'); break
+      case 'italic': document.execCommand('italic'); break
+      case 'h1': document.execCommand('formatBlock', false, '<h1>'); break
+      case 'h2': document.execCommand('formatBlock', false, '<h2>'); break
+      case 'list': document.execCommand('insertUnorderedList'); break
+      case 'quote': document.execCommand('formatBlock', false, '<blockquote>'); break
+      case 'voice': editorActionsRef.current?.handleVoiceInput?.(); break
+      case 'image': editorActionsRef.current?.handleImageUpload?.(); break
+      case 'paper': setShowLayoutPanel(true); break
+      case 'size': setShowLayoutPanel(true); break
+      case 'ai': handleSummarize(activeNoteId); break
+      case 'emoji': editorActionsRef.current?.handleEmojiPicker?.(); break
+      case 'grammar': editorActionsRef.current?.handleGrammarCheck?.(); break
+      case 'exportJSON': exportJSON(); break
+      case 'exportPDF': exportPDF(); break
+      case 'graph': setShowGraph(true); break
+      case 'drawing': setShowDrawingPad(true); break
+      case 'calculator': setShowCalculator(true); break
+      case 'add': addPage(); break
     }
-    const localNotes = JSON.parse(localStorage.getItem('notes') || '[]');
-    if (localNotes.length > 0) {
-      setNotes(localNotes);
-      setActiveNoteId(localNotes[0].id);
-    }
-  };
+  }, [activeNoteId, addPage, exportJSON, exportPDF, handleSummarize, setShowLayoutPanel, setShowGraph, setShowDrawingPad, setShowCalculator])
 
-=======
->>>>>>> b95ce7254a8b813cef834ed02a8364210c343079
   return (
-    <div className="app-layout">
-      <Navbar 
-        theme={theme} 
-        onThemeChange={handleThemeChange} 
-        onMenuToggle={() => setIsSidebarOpen(!isSidebarOpen)} 
-        isMobile={isMobile} 
-        isSidebarOpen={showSidebar} 
-<<<<<<< HEAD
-        user={user}
-        onLoginClick={() => setShowAuth(true)}
-        onLogout={handleLogout}
-        dbStatus={dbStatus}
-=======
->>>>>>> b95ce7254a8b813cef834ed02a8364210c343079
-      />
-      
-      <div 
+    <div className={`app-layout ${focusMode ? 'focus-mode' : ''}`}>
+      {authLoading ? (
+        <div className="loading-screen">Loading...</div>
+      ) : user ? (
+        <>
+          <Navbar 
+            theme={theme} 
+            onThemeChange={handleThemeChange} 
+            onMenuToggle={() => setIsSidebarOpen(!isSidebarOpen)} 
+            isMobile={isMobile} 
+            isSidebarOpen={showSidebar}
+            user={user}
+            onSignOut={handleSignOut}
+          />
+          
+          <div 
         className={`app-body ${isSidebarOpen ? 'sidebar-open' : ''} ${isEditorOpen ? 'editor-open' : ''}`}
         style={{ position: 'relative', display: 'flex', width: '100%', overflow: 'hidden' }}
       >
@@ -795,64 +807,67 @@ function App() {
         } : {}}
       >
         <div className="sidebar-controls">
-          <div className="search-group">
-            <svg className="search-icon" aria-hidden="true" viewBox="0 0 24 24"><g><path d="M21.53 20.47l-3.66-3.66C19.195 15.24 20 13.214 20 11c0-4.97-4.03-9-9-9s-9 4.03-9 9 4.03 9 9 9c2.215 0 4.24-.804 5.808-2.13l3.66 3.66c.147.146.34.22.53.22s.385-.073.53-.22c.295-.293.295-.767.002-1.06zM3.5 11c0-4.135 3.365-7.5 7.5-7.5s7.5 3.365 7.5 7.5-3.365 7.5-7.5 7.5-7.5-3.365-7.5-7.5z"></path></g></svg>
-            <input 
-              type="text" 
-              placeholder="Search..." 
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="search-input"
-            />
-          </div>
-          <div className="sort-controls">
-            <div className="radio-inputs">
-              <label className="radio">
-                <input type="radio" name="sort" value="latest" checked={sortOrder === 'latest'} onChange={(e) => setSortOrder(e.target.value)} />
-                <span className="name">Latest</span>
-              </label>
-              <label className="radio">
-                <input type="radio" name="sort" value="oldest" checked={sortOrder === 'oldest'} onChange={(e) => setSortOrder(e.target.value)} />
-                <span className="name">Oldest</span>
-              </label>
-              <label className="radio">
-                <input type="radio" name="sort" value="manual" checked={sortOrder === 'manual'} onChange={(e) => setSortOrder(e.target.value)} />
-                <span className="name">Manual</span>
-              </label>
+          <div 
+            className="search-sort-wrapper" 
+            onFocus={() => setIsSortDropdownVisible(true)} 
+            tabIndex={-1}
+            onBlur={() => setTimeout(() => setIsSortDropdownVisible(false), 150)}
+          >
+            <div className="search-group">
+              <svg className="search-icon" aria-hidden="true" viewBox="0 0 24 24"><g><path d="M21.53 20.47l-3.66-3.66C19.195 15.24 20 13.214 20 11c0-4.97-4.03-9-9-9s-9 4.03-9 9 4.03 9 9 9c2.215 0 4.24-.804 5.808-2.13l3.66 3.66c.147.146.34.22.53.22s.385-.073.53-.22c.295-.293.295-.767.002-1.06zM3.5 11c0-4.135 3.365-7.5 7.5-7.5s7.5 3.365 7.5 7.5-3.365 7.5-7.5 7.5-7.5-3.365-7.5-7.5z"></path></g></svg>
+              <input 
+                type="text" 
+                placeholder="Search notes..."
+                onChange={(e) => {
+                  if (debounceRef.current) clearTimeout(debounceRef.current);
+                  debounceRef.current = setTimeout(() => setSearchQuery(e.target.value), 200);
+                }}
+                className="search-input"
+              />
             </div>
-            <div style={{ display: 'flex', gap: '8px', marginTop: '8px' }}>
-              <button 
-                className={`btn-secondary ${showFavorites ? 'active' : ''}`} 
-                onClick={() => setShowFavorites(!showFavorites)}
-                title="Show Favorites"
-                style={{flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', padding: '8px 4px', fontSize: '12px'}}
-              >
-                <Star size={14} fill={showFavorites ? 'currentColor' : 'none'} /> Favorites {showFavorites ? ' (On)' : ' (Off)'}
-              </button>
-              <button 
-                className={`btn-secondary ${showArchived ? 'active' : ''}`} 
-                onClick={() => setShowArchived(!showArchived)}
-                title="Show Archived Notes"
-                style={{flex: 1, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: '4px', padding: '8px 4px', fontSize: '12px'}}
-              >
-                <Archive size={14} fill={showArchived ? 'currentColor' : 'none'} /> Archived {showArchived ? ' (On)' : ' (Off)'}
-              </button>
+            <div className={`sort-dropdown ${isSortDropdownVisible ? 'visible' : ''}`}>
+              <div className="radio-inputs">
+                <label className="radio">
+                  <input type="radio" name="sort" value="latest" checked={sortOrder === 'latest'} onChange={(e) => setSortOrder(e.target.value)} />
+                  <span className="name">Latest</span>
+                </label>
+                <label className="radio">
+                  <input type="radio" name="sort" value="oldest" checked={sortOrder === 'oldest'} onChange={(e) => setSortOrder(e.target.value)} />
+                  <span className="name">Oldest</span>
+                </label>
+                <label className="radio">
+                  <input type="radio" name="sort" value="manual" checked={sortOrder === 'manual'} onChange={(e) => setSortOrder(e.target.value)} />
+                  <span className="name">Manual</span>
+                </label>
+              </div>
             </div>
           </div>
-          <div style={{ display: 'flex', gap: '8px', marginTop: '12px' }}>
-            <div className="tag-filter-bar" style={{ marginTop: 0, flex: 1 }}>
-              {allFolders.filter(Boolean).map(folder => (
-                <span key={folder} className={`tag-pill ${selectedFolder === folder ? 'active' : ''}`} onClick={() => setSelectedFolder(selectedFolder === folder ? null : folder)}>
-                  📁 {folder}
-                </span>
-              ))}
-            </div>
-            <div className="tag-filter-bar" style={{ marginTop: 0, flex: 1 }}>
-              {allTags.map(tag => (
-                <span key={tag} className={`tag-pill ${selectedTag === tag ? 'active' : ''}`} onClick={() => setSelectedTag(selectedTag === tag ? null : tag)}>
-                  #{tag}
-                </span>
-              ))}
-            </div>
+          <div className="hex-controls">
+            <button className={`btn-hexagon ${showFavorites ? 'active' : ''}`} onClick={() => setShowFavorites(!showFavorites)} title="Show Favorites">
+              <Star size={16} fill={showFavorites ? 'currentColor' : 'none'} />
+            </button>
+            <button className="btn-hexagon" onClick={() => setShowSettings(true)} title="Theme Settings"><Palette size={16} /></button>
+            <button className="btn-hexagon" onClick={() => setShowQrCode(true)} title="Share via QR Code"><QrCode size={16} /></button>
+            <button className={`btn-hexagon ${showArchived ? 'active' : ''}`} onClick={() => setShowArchived(!showArchived)} title="Show Archived">
+              <Archive size={16} fill={showArchived ? 'currentColor' : 'none'} />
+            </button>
+            <button className="btn-hexagon" onClick={() => setShowLayoutPanel(true)} title="Layout Settings"><Layout size={16} /></button>
+            <button className="btn-hexagon" onClick={() => setShowSecurityPanel(true)} title="Security Settings"><Shield size={16} /></button>
+            <button className="btn-hexagon" onClick={() => setShowAutomation(true)} title="Automation Rules"><Zap size={16} /></button>
+          </div>
+          <div className="tag-filter-bar" style={{ marginTop: 0 }}>
+            {allFolders.filter(Boolean).map(folder => (
+              <span key={folder} className={`tag-pill ${selectedFolder === folder ? 'active' : ''}`} onClick={() => setSelectedFolder(selectedFolder === folder ? null : folder)}>
+                📁 {folder}
+              </span>
+            ))}
+          </div>
+          <div className="tag-filter-bar" style={{ marginTop: 0 }}>
+            {allTags.map(tag => (
+              <span key={tag} className={`tag-pill ${selectedTag === tag ? 'active' : ''}`} onClick={() => setSelectedTag(selectedTag === tag ? null : tag)}>
+                #{tag}
+              </span>
+            ))}
           </div>
         </div>
           <div className="note-list">
@@ -867,7 +882,10 @@ function App() {
                 note={note} 
                 isActive={activeNoteId === note.id} 
                 onClick={() => handleNoteSelect(note.id)}
-              searchQuery={searchQuery}
+                searchQuery={searchQuery}
+                onTogglePin={handleTogglePin}
+                onToggleFavorite={handleToggleFavorite}
+                onToggleArchive={handleToggleArchive}
               />
             ))}
           </div>
@@ -896,6 +914,9 @@ function App() {
             forwardLinks={forwardLinks}
             backlinks={backlinks}
             onNavigate={handleNoteSelect}
+            editorActionsRef={editorActionsRef}
+            onToggleFocus={() => setFocusMode(p => !p)}
+            focusMode={focusMode}
           />
         ) : (
           <div className="empty-state" style={{background: 'var(--bg-card)', margin: '24px', borderRadius: 'var(--radius)', boxShadow: 'var(--shadow)'}}>
@@ -910,14 +931,7 @@ function App() {
         Saved at {lastSavedTime} ✓
       </div>
 
-      <FloatingMenu 
-        onAdd={addPage} 
-        onGraph={() => setShowGraph(true)} 
-        onExportJSON={exportJSON} 
-        onExportPDF={exportPDF} 
-        onCalculator={() => setShowCalculator(true)}
-        onDrawingPad={() => setShowDrawingPad(true)}
-      />
+      <FloatingMenu onAction={handleFabAction} />
 
       {showGraph && (
         <GraphView 
@@ -934,25 +948,56 @@ function App() {
       )}
 
       {showDrawingPad && (
-        <DrawingPad onClose={() => setShowDrawingPad(false)} />
+        <DrawingPad onClose={() => setShowDrawingPad(false)} onSaveToNote={(dataUrl) => handleEditorUpdate(activeNoteId, { content: (activeNote?.content || '') + `<br><img src="${dataUrl}" style="max-width:100%;border-radius:8px;margin:8px 0;" />` })} />
       )}
-<<<<<<< HEAD
 
-      {showAuth && (
-        <Auth
-          onClose={() => setShowAuth(false)}
-          onSuccess={() => setShowAuth(false)}
-          onOffline={() => setDbStatus('offline')}
+      {showSettings && (
+        <SettingsPanel 
+          onClose={() => setShowSettings(false)}
+          theme={theme}
+          onThemeChange={handleThemeChange}
+          biometricEnabled={biometricEnabled}
+          onBiometricToggle={setBiometricEnabled}
+          autoLockTimeout={autoLockTimeout}
+          onAutoLockTimeoutChange={setAutoLockTimeout}
         />
       )}
 
-      {dbStatus === 'missing_table' && (
-        <div className="db-setup-banner">
-          Database table missing. Open Supabase SQL Editor and run <code>supabase/schema.sql</code>, then refresh.
-        </div>
+      {showLayoutPanel && (
+        <LayoutPanel 
+          onClose={() => setShowLayoutPanel(false)}
+          notes={notes}
+          activeNoteId={activeNoteId}
+          onUpdateNote={handleEditorUpdate}
+        />
       )}
-=======
->>>>>>> b95ce7254a8b813cef834ed02a8364210c343079
+
+      {showSecurityPanel && (
+        <SecurityPanel 
+          onClose={() => setShowSecurityPanel(false)}
+          notes={notes}
+          activeNoteId={activeNoteId}
+          onLockNote={handleSecurityLock}
+          onUnlockNote={handleSecurityUnlock}
+          biometricEnabled={biometricEnabled}
+          onBiometricToggle={setBiometricEnabled}
+          autoLockTimeout={autoLockTimeout}
+          onAutoLockTimeoutChange={setAutoLockTimeout}
+        />
+      )}
+
+      {showAutomation && (
+        <AutomationPanel onClose={() => setShowAutomation(false)} />
+      )}
+
+      {showQrCode && activeNoteForEditor && (
+        <QrCodeModal 
+          note={activeNoteForEditor}
+          onClose={() => setShowQrCode(false)}
+        />
+      )}
+      </>
+      ) : <Login />}
     </div>
   )
 }

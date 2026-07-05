@@ -1,41 +1,74 @@
-<<<<<<< HEAD
 import { useRef, useEffect, useState } from 'react';
-import { Bold, Italic, List, Heading1, Heading2, MessageSquare, Layers, HelpCircle, Mic, Share2, Lock, Unlock, Pin, Star, Archive, Trash2, X, ArrowLeft, Image as ImageIcon, Smile, CheckSquare, Folder, Bot, SpellCheck, FileText, File, Grid, ScanText, ChevronRight } from 'lucide-react';
+import { List, Heading1, Heading2, MessageSquare, Mic, Share2, Lock, Pin, Star, Archive, X, ArrowLeft, Image as ImageIcon, Smile, Bot, SpellCheck, FileText, ChevronRight, CheckSquare, Layout } from 'lucide-react';
 import Tesseract from 'tesseract.js';
-import { supabase } from './supabaseClient';
-import { uploadImageToStorage, readFileAsDataUrl } from './lib/uploadImage';
+import { PAPER_TYPES, CANVAS_SIZES, getPaperType } from './paperTypes';
+import { suggestTags } from './autoTag';
 
-const getRelativeTime = (dateString) => {
-  if (!dateString) return '';
-  const date = new Date(dateString);
-  const timeString = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  const dateStringLocale = date.toLocaleDateString();
-
-  return `${dateStringLocale} ${timeString}`;
+const PaperBackground = ({ paperType }) => {
+  return <div className={`paper-bg paper-${paperType}`} />;
 };
 
-const NoteEditor = ({ activeNote, onUpdate, onDelete, onRemoveTag, onSummarize, charCount, wordCount, onCloseEditor, onTogglePin, onToggleFavorite, onToggleLock, onToggleArchive, forwardLinks, backlinks, onNavigate }) => {
+const NoteEditor = ({ 
+  activeNote, 
+  onUpdate, 
+  onRemoveTag, 
+  onSummarize, 
+  charCount, 
+  wordCount, 
+  onCloseEditor,
+  onTogglePin,
+  onToggleFavorite,
+  onToggleArchive,
+  forwardLinks,
+  backlinks,
+  onNavigate,
+  editorActionsRef,
+  onToggleFocus,
+  focusMode,
+}) => {
   const editorRef = useRef(null);
   const fileInputRef = useRef(null);
   const coverInputRef = useRef(null);
   const [isRecording, setIsRecording] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-  const [showAiChat, setShowAiChat] = useState(false);
-  const [aiPrompt, setAiPrompt] = useState('');
-  const [isCheckingGrammar, setIsCheckingGrammar] = useState(false);
   const [grammarMatches, setGrammarMatches] = useState([]);
+  const [grammarLoading, setGrammarLoading] = useState(false);
   const [isScanningImage, setIsScanningImage] = useState(false);
   const [isToolsOpen, setIsToolsOpen] = useState(true);
+  const [showPaperSettings, setShowPaperSettings] = useState(false);
+  const [showLayoutSettings, setShowLayoutSettings] = useState(false);
+  const [wikilinks, setWikilinks] = useState([]);
 
   // Update editor content only when the active note changes
   useEffect(() => {
     if (editorRef.current && editorRef.current.innerHTML !== activeNote.content) {
-      editorRef.current.innerHTML = activeNote.content;
+      const html = (activeNote.content || '').replace(
+        /\[\[(.*?)\]\]/g,
+        (_, title) => `<a href="#" data-wikilink="${title.replace(/"/g, '&quot;')}" style="color:var(--accent);text-decoration:underline;cursor:pointer;font-weight:500;" contenteditable="false">[[${title}]]</a>`
+      );
+      editorRef.current.innerHTML = html;
     }
+    const matches = [...(activeNote.content || '').matchAll(/\[\[(.*?)\]\]/g)];
+    setWikilinks(matches.map(m => m[1]));
   }, [activeNote.id, activeNote.content]);
+
+  const stripWikilinks = (html) => {
+    const temp = document.createElement('div');
+    temp.innerHTML = html;
+    temp.querySelectorAll('a[data-wikilink]').forEach(a => {
+      const title = a.dataset.wikilink || a.textContent.replace(/\[\[|\]\]/g, '');
+      a.replaceWith(`[[${title}]]`);
+    });
+    return temp.innerHTML;
+  };
 
   const handleBlur = () => {
     if (!editorRef.current) return;
+    // Restore [[wikilinks]] from clickable anchors before saving
+    const restored = stripWikilinks(editorRef.current.innerHTML);
+    if (restored !== editorRef.current.innerHTML) {
+      editorRef.current.innerHTML = restored;
+    }
     const element = editorRef.current;
     
     const emailRegex = /([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9._-]+)/g;
@@ -46,7 +79,7 @@ const NoteEditor = ({ activeNote, onUpdate, onDelete, onRemoveTag, onSummarize, 
 
     let nodesToReplace = [];
     let node;
-    while(node = walker.nextNode()) {
+    while((node = walker.nextNode())) {
       if (node.parentNode && node.parentNode.closest && node.parentNode.closest('a')) {
         continue;
       }
@@ -83,488 +116,7 @@ const NoteEditor = ({ activeNote, onUpdate, onDelete, onRemoveTag, onSummarize, 
     if (e.key === 'Enter') {
       const newTag = e.target.value.trim();
       if (newTag && !activeNote.tags?.includes(newTag)) {
-        const updatedTags = [...(activeNote.tags || []), newTag]; // Tags are part of the note object
-        onUpdate(activeNote.id, { tags: updatedTags });
-        e.target.value = '';
-      }
-    }
-  };
-
-  const handleVoiceInput = () => {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      alert("Voice input is not supported in this browser.");
-      return;
-    }
-
-    const recognition = new SpeechRecognition();
-    recognition.lang = 'en-US';
-    recognition.continuous = false;
-
-    recognition.onstart = () => setIsRecording(true);
-    recognition.onend = () => setIsRecording(false);
-    
-    recognition.onresult = (event) => {
-      const transcript = event.results[0][0].transcript;
-      const currentHTML = editorRef.current.innerHTML;
-      const needsSpace = currentHTML.length > 0 && !currentHTML.endsWith(' ');
-      const updatedHTML = currentHTML + (needsSpace ? ' ' : '') + transcript;
-      onUpdate(activeNote.id, { content: updatedHTML });
-    };
-
-    recognition.start();
-  };
-
-  const handleShare = async () => {
-    const plainText = editorRef.current.innerText;
-    const shareData = {
-      title: activeNote.title || 'Note from Kitāb',
-      text: plainText,
-    };
-
-    if (navigator.share) {
-      await navigator.share(shareData);
-    } else {
-      await navigator.clipboard.writeText(`${shareData.title}\n\n${shareData.text}`);
-      alert("Copied to clipboard!");
-    }
-  };
-
-  const handleImageUpload = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    let imageUrl = null;
-    try {
-      imageUrl = await uploadImageToStorage(file, 'inline');
-    } catch (error) {
-      console.warn('Supabase Storage upload failed, using base64 fallback:', error.message);
-    }
-    if (!imageUrl) {
-      imageUrl = await readFileAsDataUrl(file);
-    }
-
-    editorRef.current.focus();
-    document.execCommand('insertImage', false, imageUrl);
-    onUpdate(activeNote.id, { content: editorRef.current.innerHTML });
-
-    setIsScanningImage(true);
-    try {
-      const result = await Tesseract.recognize(imageUrl, 'eng');
-      const extractedText = result.data.text.trim();
-      if (extractedText) {
-        const updatedHTML = editorRef.current.innerHTML + `<br><br><blockquote style="background: var(--bg-active); padding: 12px; border-left: 3px solid var(--accent); border-radius: 4px; font-size: 13px; margin: 8px 0;"><i>📸 OCR Extracted Text:</i><br><b>${extractedText.replace(/\n/g, '<br>')}</b></blockquote><br>`;
-        onUpdate(activeNote.id, { content: updatedHTML });
-      }
-    } catch (error) {
-      console.error('OCR Error:', error);
-    } finally {
-      setIsScanningImage(false);
-    }
-    e.target.value = '';
-  };
-
-  const handleEditorClick = (e) => {
-    const anchor = e.target.closest('a');
-    if (anchor) {
-      e.preventDefault();
-      window.open(anchor.href, anchor.getAttribute('target') || '_self');
-    }
-  };
-
-  const insertEmoji = (emoji) => {
-    editorRef.current.focus();
-    document.execCommand('insertText', false, emoji);
-    onUpdate(activeNote.id, { content: editorRef.current.innerHTML });
-    setShowEmojiPicker(false);
-  };
-
-  const handleRemoveTagClick = (tagToRemove) => {
-    onRemoveTag(activeNote.id, tagToRemove);
-  };
-
-  const handleCoverUpload = async (e) => {
-    const file = e.target.files[0];
-    if (!file) return;
-
-    try {
-      const publicUrl = await uploadImageToStorage(file, 'covers');
-      if (publicUrl) {
-        onUpdate(activeNote.id, { coverImage: publicUrl });
-        e.target.value = '';
-        return;
-      }
-    } catch (error) {
-      console.warn('Cover upload failed, using base64 fallback:', error.message);
-    }
-
-    const dataUrl = await readFileAsDataUrl(file);
-    onUpdate(activeNote.id, { coverImage: dataUrl });
-    e.target.value = '';
-  };
-
-  const removeCover = () => onUpdate(activeNote.id, { coverImage: null });
-
-  const handleGrammarCheck = async () => {
-    if (!editorRef.current) return;
-    const text = editorRef.current.innerText;
-    if (!text.trim()) return;
-    
-    setIsCheckingGrammar(true);
-    try {
-      const response = await fetch('https://api.languagetool.org/v2/check', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/x-www-form-urlencoded',
-        },
-        body: new URLSearchParams({
-          text: text,
-          language: 'auto',
-        }),
-      });
-      const data = await response.json();
-      setGrammarMatches(data.matches || []);
-      if (data.matches && data.matches.length === 0) {
-        alert("No grammar or spelling errors found!");
-      }
-    } catch (error) {
-      console.error('Error checking grammar:', error);
-      alert('Failed to check grammar. Please check your network connection.');
-    } finally {
-      setIsCheckingGrammar(false);
-    }
-  };
-
-  const readingTime = Math.max(1, Math.ceil(wordCount / 200));
-
-  return (
-    <div className="editor-wrapper">
-      {onCloseEditor && (
-        <button className="btn-icon mobile-back-button" onClick={onCloseEditor}><ArrowLeft size={20} /></button>
-      )}
-      <div className={`text-tools-wrapper ${isToolsOpen ? '' : 'collapsed'}`}>
-          <button 
-            className="text-tools-toggle" 
-            onClick={() => setIsToolsOpen(!isToolsOpen)}
-            title={isToolsOpen ? "Hide Tools" : "Show Tools"}
-          >
-            <ChevronRight size={16} style={{ transform: isToolsOpen ? 'rotate(0deg)' : 'rotate(180deg)', transition: 'transform 0.3s' }} />
-          </button>
-          <div className="text-tools">
-          <select 
-            className="font-size-select"
-            value={activeNote.fontSize || '17px'}
-            onChange={(e) => onUpdate(activeNote.id, { fontSize: e.target.value })}
-            title="Font Size"
-          >
-            <option value="13px">13</option>
-            <option value="15px">15</option>
-            <option value="17px">17</option>
-            <option value="19px">19</option>
-            <option value="21px">21</option>
-          </select>
-          <div className="toolbar-divider"></div>
-          <button className="btn-icon" onClick={() => document.execCommand('bold')} title="Bold"><Bold size={18} /></button>
-          <button className="btn-icon" onClick={() => document.execCommand('italic')} title="Italic"><Italic size={18} /></button>
-          <button className="btn-icon" onClick={() => document.execCommand('insertUnorderedList')} title="Bullet List"><List size={18} /></button>
-          <button className="btn-icon" onClick={() => {
-             editorRef.current.focus();
-             document.execCommand('insertHTML', false, '<div><input type="checkbox" />&nbsp;</div>');
-             onUpdate(activeNote.id, { content: editorRef.current.innerHTML });
-          }} title="Insert Checklist"><CheckSquare size={18} /></button>
-          <button className="btn-icon" onClick={() => document.execCommand('formatBlock', false, 'H1')} title="Heading 1"><Heading1 size={18} /></button>
-          <button className="btn-icon" onClick={() => document.execCommand('formatBlock', false, 'H2')} title="Heading 2"><Heading2 size={18} /></button>
-          <button className="btn-icon" onClick={handleGrammarCheck} disabled={isCheckingGrammar} title="Check Grammar (LanguageTool)" style={{ opacity: isCheckingGrammar ? 0.5 : 1 }}>
-            <SpellCheck size={18} />
-          </button>
-          <button className="btn-icon" onMouseDown={(e) => e.preventDefault()} onClick={() => fileInputRef.current?.click()} title="Insert Image"><ImageIcon size={18} /></button>
-          <div style={{ position: 'relative', display: 'flex' }}>
-            <button className="btn-icon" onMouseDown={(e) => e.preventDefault()} onClick={() => setShowEmojiPicker(!showEmojiPicker)} title="Insert Emoji/Sticker"><Smile size={18} /></button>
-            {showEmojiPicker && (
-              <div style={{ position: 'absolute', top: 0, right: '100%', zIndex: 50, display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '4px', padding: '8px', borderRadius: 'var(--radius)', border: '1px solid var(--border)', backgroundColor: 'var(--bg-card)', boxShadow: 'var(--shadow)', marginRight: '12px' }}>
-                {['😀', '😂', '😍', '🙏', '👍', '🚀', '⭐', '🔥', '🎉', '❤️', '💯', '✨'].map(emoji => (
-                  <button key={emoji} className="btn-icon" onMouseDown={(e) => e.preventDefault()} onClick={() => insertEmoji(emoji)} style={{ fontSize: '1.2rem', padding: '4px', width: '32px', height: '32px' }}>
-                    {emoji}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-          <input 
-            type="file" 
-            accept="image/*" 
-            ref={fileInputRef} 
-            style={{ display: 'none' }} 
-            onChange={handleImageUpload} 
-          />
-          <div className="toolbar-divider"></div>
-          <button 
-            className="btn-icon" 
-            onClick={() => {
-              const nextStyle = activeNote.paperStyle === 'ruled' ? 'grid' : activeNote.paperStyle === 'grid' ? 'plain' : 'ruled';
-              onUpdate(activeNote.id, { paperStyle: nextStyle });
-            }} 
-            title="Cycle Paper Style (Ruled, Grid, Plain)"
-          >
-            {activeNote.paperStyle === 'grid' ? <Grid size={18} /> : activeNote.paperStyle === 'plain' ? <File size={18} /> : <FileText size={18} />}
-          </button>
-          <button className="btn-icon" onClick={() => setShowAiChat(!showAiChat)} title="Chat with Note (AI)" style={{ color: showAiChat ? 'var(--accent)' : 'inherit' }}>
-            <Bot size={18} />
-          </button>
-          <button className="btn-icon" onClick={() => onSummarize(activeNote.id, 'summary')} title="Generate AI Summary"><MessageSquare size={18} /></button>
-          <button className="btn-icon" onClick={() => onSummarize(activeNote.id, 'flashcards')} title="Generate Flashcards"><Layers size={18} /></button>
-          <button className="btn-icon" onClick={() => onSummarize(activeNote.id, 'quiz')} title="Generate Practice Quiz"><HelpCircle size={18} /></button>
-          <button className={`btn-icon ${isRecording ? 'recording' : ''}`} onClick={handleVoiceInput} title="Dictate Note"><Mic size={18} /></button>
-          <button className="btn-icon" onClick={handleShare} title="Share/Copy Note"><Share2 size={18} /></button>
-        </div>
-      </div>
-      <div className="toolbar glass-panel" style={{ padding: '4px 8px', gap: '8px', minHeight: 'auto', justifyContent: 'flex-end' }}>
-        <div className="tag-tools" style={{ gap: '2px' }}>
-          <input type="text" placeholder="Add tag + Enter" onKeyDown={handleTagInput} className="tag-input" />
-          <button className="btn-icon" onClick={() => onToggleLock(activeNote.id)} title={activeNote.isLocked ? "Unlock Note" : "Lock Note"}>
-            {activeNote.isLocked ? <Unlock size={18} /> : <Lock size={18} />}
-          </button>
-          <button className="btn-icon" onClick={() => onTogglePin(activeNote.id)} title="Pin Note">
-            <Pin size={18} fill={activeNote.isPinned ? "currentColor" : "none"} />
-          </button>
-          <button className="btn-icon" onClick={() => onToggleFavorite(activeNote.id)} title="Favorite Note">
-            <Star size={18} fill={activeNote.isFavorite ? "currentColor" : "none"} color={activeNote.isFavorite ? "var(--accent)" : "currentColor"} />
-          </button>
-          <button className="btn-icon" onClick={() => onToggleArchive(activeNote.id)} title={activeNote.isArchived ? "Unarchive Note" : "Archive Note"}>
-            <Archive size={18} fill={activeNote.isArchived ? "currentColor" : "none"} />
-          </button>
-          <button className="btn-icon delete-btn" onClick={() => onDelete(activeNote.id)} title="Delete Note"><Trash2 size={18} /></button>
-        </div>
-      </div>
-
-      <div className="note-editor-container paper-shadow">
-        <input type="file" accept="image/*" ref={coverInputRef} style={{ display: 'none' }} onChange={handleCoverUpload} />
-        {activeNote.coverImage ? (
-          <div className="note-cover" style={{ backgroundImage: `url(${activeNote.coverImage})` }}>
-            <div className="note-cover-controls">
-              <button onClick={() => coverInputRef.current?.click()}>Change Cover</button>
-              <button onClick={removeCover}>Remove</button>
-            </div>
-          </div>
-        ) : (
-          <button className="add-cover-btn" onClick={() => coverInputRef.current?.click()}>
-            <ImageIcon size={14} /> Add Cover
-          </button>
-        )}
-        <input 
-          className="note-title-input"
-          value={activeNote.title}
-          onChange={(e) => onUpdate(activeNote.id, { title: e.target.value })}
-          placeholder="Note Title..."
-        />
-        {showAiChat && (
-          <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', background: 'var(--highlight)', padding: '12px', borderRadius: 'var(--radius)', border: '1px solid var(--accent)' }}>
-            <Bot size={20} color="var(--accent)" style={{ alignSelf: 'center', minWidth: '20px' }} />
-            <input 
-              type="text" 
-              value={aiPrompt}
-              onChange={(e) => setAiPrompt(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && aiPrompt.trim()) {
-                  onSummarize(activeNote.id, 'ask', aiPrompt);
-                  setAiPrompt('');
-                  setShowAiChat(false);
-                }
-              }}
-              placeholder="Ask AI to extract info, format text, or answer questions based on this note..."
-              style={{ flex: 1, padding: '8px 12px', borderRadius: 'var(--radius)', border: '1px solid var(--border)', outline: 'none', background: 'var(--bg-app)', color: 'var(--text-main)' }}
-            />
-            <button 
-              className="btn-primary" 
-              disabled={!aiPrompt.trim()}
-              onClick={() => {
-                onSummarize(activeNote.id, 'ask', aiPrompt);
-                setAiPrompt('');
-                setShowAiChat(false);
-              }}
-              style={{ opacity: !aiPrompt.trim() ? 0.5 : 1 }}
-            >
-              Ask
-            </button>
-          </div>
-        )}
-        {grammarMatches.length > 0 && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px', background: 'var(--highlight)', padding: '12px', borderRadius: 'var(--radius)', border: '1px solid var(--accent)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <strong style={{ color: 'var(--accent)', fontSize: '13px' }}>Grammar & Spelling Suggestions</strong>
-              <button className="btn-icon" onClick={() => setGrammarMatches([])} style={{ padding: '4px', minWidth: 'auto' }}><X size={14} /></button>
-            </div>
-            <ul style={{ margin: 0, paddingLeft: '20px', fontSize: '13px', color: 'var(--text-main)' }}>
-              {grammarMatches.map((match, index) => (
-                <li key={index} style={{ marginBottom: '8px' }}>
-                  <span>"{match.context.text.substring(match.context.offset, match.context.offset + match.context.length)}"</span> - {match.message}
-                  {match.replacements?.length > 0 && (
-                    <div style={{ marginTop: '4px', color: 'var(--text-muted)' }}>
-                      <em>Suggestions: </em> 
-                      {match.replacements.slice(0, 3).map(r => r.value).join(', ')}
-                    </div>
-                  )}
-                </li>
-              ))}
-            </ul>
-          </div>
-        )}
-        <div className="note-metadata">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Folder size={14} color="var(--text-muted)" />
-            <input
-              type="text"
-              value={activeNote.folder || ''}
-              onChange={(e) => onUpdate(activeNote.id, { folder: e.target.value })}
-              placeholder="No folder assigned"
-              style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', fontSize: '12px', outline: 'none' }}
-            />
-          </div>
-          <span>Last edited: {getRelativeTime(activeNote.updated_at)}</span>
-          {activeNote.isLocked && <span> | 🔒 Locked note (unlocked in this session)</span>}
-        </div>
-        <div
-          ref={editorRef}
-          className={`note digital-paper ${activeNote.paperStyle === 'grid' ? 'grid-paper' : activeNote.paperStyle === 'plain' ? 'plain-paper' : 'ruled-paper'}`}
-          contentEditable="true"
-          suppressContentEditableWarning={true}
-          onInput={(e) => onUpdate(activeNote.id, { content: e.currentTarget.innerHTML })}
-          onBlur={handleBlur}
-          onClick={handleEditorClick}
-          style={{ fontSize: activeNote.fontSize || '17px' }}
-        />
-        <div className="editor-footer">
-          <div className="tags-display">
-            {(activeNote.tags || []).map(t => (
-              <span key={t} className="tag-badge">#{t}
-              <button className="remove-tag-btn" onClick={() => handleRemoveTagClick(t)}><X size={12} /></button>
-              </span>
-            ))}</div>
-        <div className="char-counter">
-          {isRecording && <span style={{ color: '#ff4444', fontWeight: 'bold', marginRight: '8px', animation: 'pulse 1.5s infinite' }}>🔴 Listening...</span>}
-          {isScanningImage && <span style={{ color: 'var(--accent)', fontWeight: 'bold', marginRight: '8px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}><ScanText size={12}/> Scanning Image...</span>}
-          {charCount} chars | {wordCount} words | ~{readingTime} min read
-        </div>
-        </div>
-        
-        {/* Bi-Directional Links Section */}
-        {(forwardLinks?.length > 0 || backlinks?.length > 0) && (
-          <div style={{ marginTop: '24px', paddingTop: '16px', borderTop: '1px solid var(--border)' }}>
-            {forwardLinks?.length > 0 && (
-              <div style={{ marginBottom: backlinks?.length > 0 ? '16px' : '0' }}>
-                <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>🔗 Linked Mentions</span>
-                <div style={{ display: 'flex', gap: '8px', marginTop: '8px', flexWrap: 'wrap' }}>
-                  {forwardLinks.map(link => (
-                    <button key={link.id} onClick={() => onNavigate(link.id)} className="tag-pill" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <Layers size={10} /> {link.title || 'Untitled'}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-            {backlinks?.length > 0 && (
-              <div>
-                <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>🔙 Backlinks</span>
-                <div style={{ display: 'flex', gap: '8px', marginTop: '8px', flexWrap: 'wrap' }}>
-                  {backlinks.map(link => (
-                    <button key={link.id} onClick={() => onNavigate(link.id)} className="tag-pill" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <Layers size={10} /> {link.title || 'Untitled'}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-};
-
-=======
-import { useRef, useEffect, useState } from 'react';
-import { Bold, Italic, List, Heading1, Heading2, MessageSquare, Layers, HelpCircle, Mic, Share2, Lock, Unlock, Pin, Star, Archive, Trash2, X, ArrowLeft, Image as ImageIcon, Smile, CheckSquare, Folder, Bot, SpellCheck, FileText, File, Grid, ScanText, ChevronRight } from 'lucide-react';
-import Tesseract from 'tesseract.js';
-
-const getRelativeTime = (dateString) => {
-  if (!dateString) return '';
-  const date = new Date(dateString);
-  const timeString = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
-  const dateStringLocale = date.toLocaleDateString();
-
-  return `${dateStringLocale} ${timeString}`;
-};
-
-const NoteEditor = ({ activeNote, onUpdate, onDelete, onRemoveTag, onSummarize, charCount, wordCount, onCloseEditor, onTogglePin, onToggleFavorite, onToggleLock, onToggleArchive, forwardLinks, backlinks, onNavigate }) => {
-  const editorRef = useRef(null);
-  const fileInputRef = useRef(null);
-  const coverInputRef = useRef(null);
-  const [isRecording, setIsRecording] = useState(false);
-  const [showEmojiPicker, setShowEmojiPicker] = useState(false);
-  const [showAiChat, setShowAiChat] = useState(false);
-  const [aiPrompt, setAiPrompt] = useState('');
-  const [isCheckingGrammar, setIsCheckingGrammar] = useState(false);
-  const [grammarMatches, setGrammarMatches] = useState([]);
-  const [isScanningImage, setIsScanningImage] = useState(false);
-  const [isToolsOpen, setIsToolsOpen] = useState(true);
-
-  // Update editor content only when the active note changes
-  useEffect(() => {
-    if (editorRef.current && editorRef.current.innerHTML !== activeNote.content) {
-      editorRef.current.innerHTML = activeNote.content;
-    }
-  }, [activeNote.id, activeNote.content]);
-
-  const handleBlur = () => {
-    if (!editorRef.current) return;
-    const element = editorRef.current;
-    
-    const emailRegex = /([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9._-]+)/g;
-    const urlRegex = /(https?:\/\/[^\s<]+)/g;
-    const wwwRegex = /(^|\s)(www\.[^\s<]+)/g;
-    
-    const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT, null, false);
-
-    let nodesToReplace = [];
-    let node;
-    while(node = walker.nextNode()) {
-      if (node.parentNode && node.parentNode.closest && node.parentNode.closest('a')) {
-        continue;
-      }
-      if (node.nodeValue.match(emailRegex) || node.nodeValue.match(urlRegex) || node.nodeValue.match(wwwRegex)) {
-        nodesToReplace.push(node);
-      }
-    }
-
-    let changed = false;
-    nodesToReplace.forEach(textNode => {
-      let text = textNode.nodeValue;
-      let replaced = text
-        .replace(urlRegex, '<a href="$1" target="_blank" style="color: var(--accent); text-decoration: underline; cursor: pointer;">$1</a>')
-        .replace(wwwRegex, '$1<a href="https://$2" target="_blank" style="color: var(--accent); text-decoration: underline; cursor: pointer;">$2</a>')
-        .replace(emailRegex, '<a href="mailto:$1" target="_blank" style="color: var(--accent); text-decoration: underline; cursor: pointer;">$1</a>');
-        
-      if (replaced !== text) {
-        const tempDiv = document.createElement('div');
-        tempDiv.innerHTML = replaced;
-        while (tempDiv.firstChild) {
-          textNode.parentNode.insertBefore(tempDiv.firstChild, textNode);
-        }
-        textNode.parentNode.removeChild(textNode);
-        changed = true;
-      }
-    });
-
-    if (changed) {
-      onUpdate(activeNote.id, { content: element.innerHTML });
-    }
-  };
-
-  const handleTagInput = (e) => {
-    if (e.key === 'Enter') {
-      const newTag = e.target.value.trim();
-      if (newTag && !activeNote.tags?.includes(newTag)) {
-        const updatedTags = [...(activeNote.tags || []), newTag]; // Tags are part of the note object
+        const updatedTags = [...(activeNote.tags || []), newTag];
         onUpdate(activeNote.id, { tags: updatedTags });
         e.target.value = '';
       }
@@ -644,15 +196,12 @@ const NoteEditor = ({ activeNote, onUpdate, onDelete, onRemoveTag, onSummarize, 
     const anchor = e.target.closest('a');
     if (anchor) {
       e.preventDefault();
-      window.open(anchor.href, anchor.getAttribute('target') || '_self');
+      if (anchor.dataset.wikilink) {
+        onNavigate?.(anchor.dataset.wikilink);
+      } else {
+        window.open(anchor.href, anchor.getAttribute('target') || '_self');
+      }
     }
-  };
-
-  const insertEmoji = (emoji) => {
-    editorRef.current.focus();
-    document.execCommand('insertText', false, emoji);
-    onUpdate(activeNote.id, { content: editorRef.current.innerHTML });
-    setShowEmojiPicker(false);
   };
 
   const handleRemoveTagClick = (tagToRemove) => {
@@ -677,7 +226,7 @@ const NoteEditor = ({ activeNote, onUpdate, onDelete, onRemoveTag, onSummarize, 
     const text = editorRef.current.innerText;
     if (!text.trim()) return;
     
-    setIsCheckingGrammar(true);
+    setGrammarLoading(true);
     try {
       const response = await fetch('https://api.languagetool.org/v2/check', {
         method: 'POST',
@@ -698,26 +247,52 @@ const NoteEditor = ({ activeNote, onUpdate, onDelete, onRemoveTag, onSummarize, 
       console.error('Error checking grammar:', error);
       alert('Failed to check grammar. Please check your network connection.');
     } finally {
-      setIsCheckingGrammar(false);
+      setGrammarLoading(false);
     }
   };
 
   const readingTime = Math.max(1, Math.ceil(wordCount / 200));
+
+  useEffect(() => {
+    if (editorActionsRef) {
+      editorActionsRef.current = {
+        handleVoiceInput,
+        handleImageUpload: () => fileInputRef.current?.click(),
+        handleEmojiPicker: () => setShowEmojiPicker(p => !p),
+        handleGrammarCheck,
+      };
+    }
+  });
+
+  const paperType = activeNote.paperStyle || 'ruled';
+  const canvasSize = activeNote.canvasSize || 'A5';
+  const paper = getPaperType(paperType);
+
+  const togglePaperType = (typeId) => {
+    onUpdate(activeNote.id, { paperStyle: typeId });
+    setShowPaperSettings(false);
+  };
+
+  const toggleCanvasSize = (sizeId) => {
+    onUpdate(activeNote.id, { canvasSize: sizeId });
+    setShowLayoutSettings(false);
+  };
 
   return (
     <div className="editor-wrapper">
       {onCloseEditor && (
         <button className="btn-icon mobile-back-button" onClick={onCloseEditor}><ArrowLeft size={20} /></button>
       )}
+      
       <div className={`text-tools-wrapper ${isToolsOpen ? '' : 'collapsed'}`}>
-          <button 
-            className="text-tools-toggle" 
-            onClick={() => setIsToolsOpen(!isToolsOpen)}
-            title={isToolsOpen ? "Hide Tools" : "Show Tools"}
-          >
-            <ChevronRight size={16} style={{ transform: isToolsOpen ? 'rotate(0deg)' : 'rotate(180deg)', transition: 'transform 0.3s' }} />
-          </button>
-          <div className="text-tools">
+        <button 
+          className="text-tools-toggle" 
+          onClick={() => setIsToolsOpen(!isToolsOpen)}
+          title={isToolsOpen ? "Hide Tools" : "Show Tools"}
+        >
+          <ChevronRight size={14} style={{ transform: isToolsOpen ? 'rotate(0deg)' : 'rotate(180deg)', transition: 'transform 0.3s' }} />
+        </button>
+        <div className="text-tools">
           <select 
             className="font-size-select"
             value={activeNote.fontSize || '17px'}
@@ -730,223 +305,375 @@ const NoteEditor = ({ activeNote, onUpdate, onDelete, onRemoveTag, onSummarize, 
             <option value="19px">19</option>
             <option value="21px">21</option>
           </select>
+          <button className="btn-icon sm" onClick={() => document.execCommand('bold')} title="Bold"><strong>B</strong></button>
+          <button className="btn-icon sm" onClick={() => document.execCommand('italic')} title="Italic"><em>i</em></button>
+          <button className="btn-icon sm" onClick={() => document.execCommand('insertUnorderedList')} title="Bullet List"><List size={15} /></button>
+          <button className="btn-icon sm" onClick={() => document.execCommand('insertOrderedList')} title="Numbered List"><CheckSquare size={15} /></button>
+          <button className="btn-icon sm" onClick={() => document.execCommand('formatBlock', false, 'h1')} title="Heading 1"><Heading1 size={15} /></button>
+          <button className="btn-icon sm" onClick={() => document.execCommand('formatBlock', false, 'h2')} title="Heading 2"><Heading2 size={15} /></button>
+          <button className="btn-icon sm" onClick={() => document.execCommand('formatBlock', false, 'blockquote')} title="Quote"><MessageSquare size={15} /></button>
+          <button className="btn-icon sm" onClick={() => document.execCommand('insertHorizontalRule')} title="Divider">—</button>
           <div className="toolbar-divider"></div>
-          <button className="btn-icon" onClick={() => document.execCommand('bold')} title="Bold"><Bold size={18} /></button>
-          <button className="btn-icon" onClick={() => document.execCommand('italic')} title="Italic"><Italic size={18} /></button>
-          <button className="btn-icon" onClick={() => document.execCommand('insertUnorderedList')} title="Bullet List"><List size={18} /></button>
-          <button className="btn-icon" onClick={() => {
-             editorRef.current.focus();
-             document.execCommand('insertHTML', false, '<div><input type="checkbox" />&nbsp;</div>');
-             onUpdate(activeNote.id, { content: editorRef.current.innerHTML });
-          }} title="Insert Checklist"><CheckSquare size={18} /></button>
-          <button className="btn-icon" onClick={() => document.execCommand('formatBlock', false, 'H1')} title="Heading 1"><Heading1 size={18} /></button>
-          <button className="btn-icon" onClick={() => document.execCommand('formatBlock', false, 'H2')} title="Heading 2"><Heading2 size={18} /></button>
-          <button className="btn-icon" onClick={handleGrammarCheck} disabled={isCheckingGrammar} title="Check Grammar (LanguageTool)" style={{ opacity: isCheckingGrammar ? 0.5 : 1 }}>
-            <SpellCheck size={18} />
-          </button>
-          <button className="btn-icon" onMouseDown={(e) => e.preventDefault()} onClick={() => fileInputRef.current?.click()} title="Insert Image"><ImageIcon size={18} /></button>
-          <div style={{ position: 'relative', display: 'flex' }}>
-            <button className="btn-icon" onMouseDown={(e) => e.preventDefault()} onClick={() => setShowEmojiPicker(!showEmojiPicker)} title="Insert Emoji/Sticker"><Smile size={18} /></button>
-            {showEmojiPicker && (
-              <div style={{ position: 'absolute', top: 0, right: '100%', zIndex: 50, display: 'grid', gridTemplateColumns: 'repeat(4, 1fr)', gap: '4px', padding: '8px', borderRadius: 'var(--radius)', border: '1px solid var(--border)', backgroundColor: 'var(--bg-card)', boxShadow: 'var(--shadow)', marginRight: '12px' }}>
-                {['😀', '😂', '😍', '🙏', '👍', '🚀', '⭐', '🔥', '🎉', '❤️', '💯', '✨'].map(emoji => (
-                  <button key={emoji} className="btn-icon" onMouseDown={(e) => e.preventDefault()} onClick={() => insertEmoji(emoji)} style={{ fontSize: '1.2rem', padding: '4px', width: '32px', height: '32px' }}>
-                    {emoji}
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-          <input 
-            type="file" 
-            accept="image/*" 
-            ref={fileInputRef} 
-            style={{ display: 'none' }} 
-            onChange={handleImageUpload} 
-          />
+          <button className="btn-icon sm" onClick={handleVoiceInput} title="Voice Input" style={{ color: isRecording ? 'var(--danger)' : 'var(--text-muted)' }}><Mic size={15} /></button>
+          <button className="btn-icon sm" onClick={handleShare} title="Share"><Share2 size={15} /></button>
+          <button className="btn-icon sm" onClick={() => fileInputRef.current?.click()} title="Insert Image"><ImageIcon size={15} /></button>
+          <input type="file" ref={fileInputRef} accept="image/*" onChange={handleImageUpload} style={{ display: 'none' }} />
           <div className="toolbar-divider"></div>
-          <button 
-            className="btn-icon" 
-            onClick={() => {
-              const nextStyle = activeNote.paperStyle === 'ruled' ? 'grid' : activeNote.paperStyle === 'grid' ? 'plain' : 'ruled';
-              onUpdate(activeNote.id, { paperStyle: nextStyle });
-            }} 
-            title="Cycle Paper Style (Ruled, Grid, Plain)"
-          >
-            {activeNote.paperStyle === 'grid' ? <Grid size={18} /> : activeNote.paperStyle === 'plain' ? <File size={18} /> : <FileText size={18} />}
-          </button>
-          <button className="btn-icon" onClick={() => setShowAiChat(!showAiChat)} title="Chat with Note (AI)" style={{ color: showAiChat ? 'var(--accent)' : 'inherit' }}>
-            <Bot size={18} />
-          </button>
-          <button className="btn-icon" onClick={() => onSummarize(activeNote.id, 'summary')} title="Generate AI Summary"><MessageSquare size={18} /></button>
-          <button className="btn-icon" onClick={() => onSummarize(activeNote.id, 'flashcards')} title="Generate Flashcards"><Layers size={18} /></button>
-          <button className="btn-icon" onClick={() => onSummarize(activeNote.id, 'quiz')} title="Generate Practice Quiz"><HelpCircle size={18} /></button>
-          <button className={`btn-icon ${isRecording ? 'recording' : ''}`} onClick={handleVoiceInput} title="Dictate Note"><Mic size={18} /></button>
-          <button className="btn-icon" onClick={handleShare} title="Share/Copy Note"><Share2 size={18} /></button>
-        </div>
-      </div>
-      <div className="toolbar glass-panel" style={{ padding: '4px 8px', gap: '8px', minHeight: 'auto', justifyContent: 'flex-end' }}>
-        <div className="tag-tools" style={{ gap: '2px' }}>
-          <input type="text" placeholder="Add tag + Enter" onKeyDown={handleTagInput} className="tag-input" />
-          <button className="btn-icon" onClick={() => onToggleLock(activeNote.id)} title={activeNote.isLocked ? "Unlock Note" : "Lock Note"}>
-            {activeNote.isLocked ? <Unlock size={18} /> : <Lock size={18} />}
-          </button>
-          <button className="btn-icon" onClick={() => onTogglePin(activeNote.id)} title="Pin Note">
-            <Pin size={18} fill={activeNote.isPinned ? "currentColor" : "none"} />
-          </button>
-          <button className="btn-icon" onClick={() => onToggleFavorite(activeNote.id)} title="Favorite Note">
-            <Star size={18} fill={activeNote.isFavorite ? "currentColor" : "none"} color={activeNote.isFavorite ? "var(--accent)" : "currentColor"} />
-          </button>
-          <button className="btn-icon" onClick={() => onToggleArchive(activeNote.id)} title={activeNote.isArchived ? "Unarchive Note" : "Archive Note"}>
-            <Archive size={18} fill={activeNote.isArchived ? "currentColor" : "none"} />
-          </button>
-          <button className="btn-icon delete-btn" onClick={() => onDelete(activeNote.id)} title="Delete Note"><Trash2 size={18} /></button>
+          <button className="btn-icon sm" onClick={handleGrammarCheck} title="Grammar Check"><SpellCheck size={15} /></button>
+          <button className="btn-icon sm" onClick={() => setShowEmojiPicker(!showEmojiPicker)} title="Emoji"><Smile size={15} /></button>
+          <div className="toolbar-divider"></div>
+          <button className="btn-icon sm" onClick={() => setShowPaperSettings(!showPaperSettings)} title="Paper"><FileText size={15} /></button>
+          <button className="btn-icon sm" onClick={() => setShowLayoutSettings(!showLayoutSettings)} title="Size"><Layout size={15} /></button>
+          <button className="btn-icon sm" onClick={onSummarize} title="AI"><Bot size={15} /></button>
+          <button className="btn-icon sm" onClick={onToggleFocus} title="Focus Mode" style={{ opacity: focusMode ? 1 : 0.5 }}><Layout size={15} /></button>
+          {isRecording && <span className="rec-badge">🔴</span>}
+          {isScanningImage && <span className="scan-badge">📸</span>}
         </div>
       </div>
 
-      <div className="note-editor-container paper-shadow">
-        <input type="file" accept="image/*" ref={coverInputRef} style={{ display: 'none' }} onChange={handleCoverUpload} />
-        {activeNote.coverImage ? (
-          <div className="note-cover" style={{ backgroundImage: `url(${activeNote.coverImage})` }}>
-            <div className="note-cover-controls">
-              <button onClick={() => coverInputRef.current?.click()}>Change Cover</button>
-              <button onClick={removeCover}>Remove</button>
-            </div>
-          </div>
-        ) : (
-          <button className="add-cover-btn" onClick={() => coverInputRef.current?.click()}>
-            <ImageIcon size={14} /> Add Cover
-          </button>
-        )}
-        <input 
-          className="note-title-input"
-          value={activeNote.title}
-          onChange={(e) => onUpdate(activeNote.id, { title: e.target.value })}
-          placeholder="Note Title..."
-        />
-        {showAiChat && (
-          <div style={{ display: 'flex', gap: '8px', marginBottom: '16px', background: 'var(--highlight)', padding: '12px', borderRadius: 'var(--radius)', border: '1px solid var(--accent)' }}>
-            <Bot size={20} color="var(--accent)" style={{ alignSelf: 'center', minWidth: '20px' }} />
-            <input 
-              type="text" 
-              value={aiPrompt}
-              onChange={(e) => setAiPrompt(e.target.value)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' && aiPrompt.trim()) {
-                  onSummarize(activeNote.id, 'ask', aiPrompt);
-                  setAiPrompt('');
-                  setShowAiChat(false);
-                }
-              }}
-              placeholder="Ask AI to extract info, format text, or answer questions based on this note..."
-              style={{ flex: 1, padding: '8px 12px', borderRadius: 'var(--radius)', border: '1px solid var(--border)', outline: 'none', background: 'var(--bg-app)', color: 'var(--text-main)' }}
+      <div className="editor-container" style={{ 
+        maxWidth: '100%', 
+        width: '100%',
+        flex: 1,
+        display: 'flex',
+        flexDirection: 'column',
+      }}>
+        {activeNote.coverImage && (
+          <div className="note-cover-wrapper" style={{ marginBottom: '1.5rem', borderRadius: 'var(--radius)', overflow: 'hidden', position: 'relative' }}>
+            <img 
+              src={activeNote.coverImage} 
+              alt="Note cover" 
+              className="note-cover-image"
+              style={{ width: '100%', height: '200px', objectFit: 'cover', display: 'block' }}
             />
-            <button 
-              className="btn-primary" 
-              disabled={!aiPrompt.trim()}
-              onClick={() => {
-                onSummarize(activeNote.id, 'ask', aiPrompt);
-                setAiPrompt('');
-                setShowAiChat(false);
-              }}
-              style={{ opacity: !aiPrompt.trim() ? 0.5 : 1 }}
-            >
-              Ask
-            </button>
+            <div className="cover-actions">
+              <button className="btn-icon" onClick={handleCoverUpload} title="Change Cover"><ImageIcon size={16} /></button>
+              <button className="btn-icon" onClick={removeCover} title="Remove Cover"><X size={16} /></button>
+            </div>
+            <input type="file" ref={coverInputRef} accept="image/*" onChange={handleCoverUpload} style={{ display: 'none' }} />
+            <style jsx>{`
+              .note-cover-wrapper { position: relative; }
+              .cover-actions { position: absolute; top: 8px; right: 8px; display: flex; gap: 4px; opacity: 0; transition: opacity 0.2s; }
+              .note-cover-wrapper:hover .cover-actions { opacity: 1; }
+            `}</style>
           </div>
         )}
-        {grammarMatches.length > 0 && (
-          <div style={{ display: 'flex', flexDirection: 'column', gap: '8px', marginBottom: '16px', background: 'var(--highlight)', padding: '12px', borderRadius: 'var(--radius)', border: '1px solid var(--accent)' }}>
-            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <strong style={{ color: 'var(--accent)', fontSize: '13px' }}>Grammar & Spelling Suggestions</strong>
-              <button className="btn-icon" onClick={() => setGrammarMatches([])} style={{ padding: '4px', minWidth: 'auto' }}><X size={14} /></button>
-            </div>
-            <ul style={{ margin: 0, paddingLeft: '20px', fontSize: '13px', color: 'var(--text-main)' }}>
-              {grammarMatches.map((match, index) => (
-                <li key={index} style={{ marginBottom: '8px' }}>
-                  <span>"{match.context.text.substring(match.context.offset, match.context.offset + match.context.length)}"</span> - {match.message}
-                  {match.replacements?.length > 0 && (
-                    <div style={{ marginTop: '4px', color: 'var(--text-muted)' }}>
-                      <em>Suggestions: </em> 
-                      {match.replacements.slice(0, 3).map(r => r.value).join(', ')}
-                    </div>
-                  )}
-                </li>
+
+        <div 
+          className={`note digital-paper paper-${paperType} size-${canvasSize.toLowerCase()}`}
+          style={{
+            fontSize: activeNote.fontSize || '17px',
+            lineHeight: 1.6,
+            fontFamily: activeNote.fontFamily || 'system',
+            minHeight: '500px',
+            position: 'relative',
+          }}
+        >
+          <PaperBackground paperType={paperType} canvasSize={canvasSize} />
+          
+          <div 
+            ref={editorRef}
+            contentEditable
+            suppressContentEditableWarning
+            onBlur={handleBlur}
+            onClick={handleEditorClick}
+            className="editor-content"
+            spellCheck="true"
+            data-grammar-matches={JSON.stringify(grammarMatches)}
+            style={{
+              position: 'relative',
+              zIndex: 10,
+              padding: `${paper.marginTop}px ${paper.marginRight}px ${paper.marginBottom}px ${paper.marginLeft}px`,
+              minHeight: '400px',
+              outline: 'none',
+              whiteSpace: 'pre-wrap',
+              wordWrap: 'break-word',
+            }}
+          />
+          
+          {grammarMatches.length > 0 && (
+            <div className="grammar-popover">
+              {grammarMatches.slice(0, 5).map((match, i) => (
+                <div key={i} className="grammar-issue">
+                  <span>{match.message}</span>
+                  <button onClick={() => {
+                    const text = editorRef.current.innerText;
+                    const replacement = match.replacements?.[0]?.value || '';
+                    const newText = text.replace(match.context.text, replacement);
+                    editorRef.current.innerText = newText;
+                    onUpdate(activeNote.id, { content: editorRef.current.innerHTML });
+                    setGrammarMatches(grammarMatches.filter((_, idx) => idx !== i));
+                  }}>
+                    Fix
+                  </button>
+                </div>
               ))}
-            </ul>
-          </div>
-        )}
-        <div className="note-metadata">
-          <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-            <Folder size={14} color="var(--text-muted)" />
-            <input
-              type="text"
-              value={activeNote.folder || ''}
-              onChange={(e) => onUpdate(activeNote.id, { folder: e.target.value })}
-              placeholder="No folder assigned"
-              style={{ background: 'transparent', border: 'none', color: 'var(--text-muted)', fontSize: '12px', outline: 'none' }}
-            />
-          </div>
-          <span>Last edited: {getRelativeTime(activeNote.updated_at)}</span>
-          {activeNote.isLocked && <span> | 🔒 Locked note (unlocked in this session)</span>}
+            </div>
+          )}
         </div>
-        <div
-          ref={editorRef}
-          className={`note digital-paper ${activeNote.paperStyle === 'grid' ? 'grid-paper' : activeNote.paperStyle === 'plain' ? 'plain-paper' : 'ruled-paper'}`}
-          contentEditable="true"
-          suppressContentEditableWarning={true}
-          onInput={(e) => onUpdate(activeNote.id, { content: e.currentTarget.innerHTML })}
-          onBlur={handleBlur}
-          onClick={handleEditorClick}
-          style={{ fontSize: activeNote.fontSize || '17px' }}
-        />
+
         <div className="editor-footer">
+          <div className="footer-meta">
+            <span className="char-counter">{charCount}c · {wordCount}w · {readingTime}m</span>
+            <div className="note-meta">
+              <button className="btn-icon sm" onClick={() => onTogglePin?.(activeNote.id)} title={activeNote.isPinned ? 'Unpin' : 'Pin'} style={{ color: activeNote.isPinned ? 'var(--accent)' : undefined }}>
+                <Pin size={12} fill={activeNote.isPinned ? 'currentColor' : 'none'} />
+              </button>
+              <button className="btn-icon sm" onClick={() => onToggleFavorite?.(activeNote.id)} title={activeNote.isFavorite ? 'Unfavorite' : 'Favorite'} style={{ color: activeNote.isFavorite ? 'var(--accent)' : undefined }}>
+                <Star size={12} fill={activeNote.isFavorite ? 'currentColor' : 'none'} />
+              </button>
+              <button className="btn-icon sm" onClick={() => onToggleArchive?.(activeNote.id)} title={activeNote.isArchived ? 'Unarchive' : 'Archive'}>
+                <Archive size={12} />
+              </button>
+              {activeNote.isLocked && <Lock size={12} />}
+            </div>
+          </div>
+          {forwardLinks?.length > 0 && (
+            <div className="links-bar" style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', padding: '4px 0', fontSize: '12px', color: 'var(--text-muted)' }}>
+              <span>→</span>
+              {forwardLinks.map(link => (
+                <button key={link.id} className="btn-icon sm" onClick={() => onNavigate?.(link.id)} title={link.title} style={{ fontSize: '12px', gap: '2px' }}>
+                  {link.title}
+                </button>
+              ))}
+            </div>
+          )}
+          {backlinks?.length > 0 && (
+            <div className="links-bar" style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', padding: '4px 0', fontSize: '12px', color: 'var(--text-muted)' }}>
+              <span>←</span>
+              {backlinks.map(link => (
+                <button key={link.id} className="btn-icon sm" onClick={() => onNavigate?.(link.id)} title={link.title} style={{ fontSize: '12px', gap: '2px' }}>
+                  {link.title}
+                </button>
+              ))}
+            </div>
+          )}
           <div className="tags-display">
-            {(activeNote.tags || []).map(t => (
-              <span key={t} className="tag-badge">#{t}
-              <button className="remove-tag-btn" onClick={() => handleRemoveTagClick(t)}><X size={12} /></button>
+            {activeNote.tags?.map(tag => (
+              <span key={tag} className="tag-badge">
+                {tag}
+                <button className="remove-tag-btn" onClick={() => handleRemoveTagClick(tag)}>×</button>
               </span>
-            ))}</div>
-        <div className="char-counter">
-          {isRecording && <span style={{ color: '#ff4444', fontWeight: 'bold', marginRight: '8px', animation: 'pulse 1.5s infinite' }}>🔴 Listening...</span>}
-          {isScanningImage && <span style={{ color: 'var(--accent)', fontWeight: 'bold', marginRight: '8px', display: 'inline-flex', alignItems: 'center', gap: '4px' }}><ScanText size={12}/> Scanning Image...</span>}
-          {charCount} chars | {wordCount} words | ~{readingTime} min read
+            ))}
+            <input type="text" className="tag-input" placeholder="tag" onKeyDown={handleTagInput} />
+            <button className="btn-icon sm" onClick={() => {
+              const suggestions = suggestTags(activeNote);
+              suggestions.forEach(tag => {
+                if (!activeNote.tags?.includes(tag)) {
+                  const updatedTags = [...(activeNote.tags || []), tag];
+                  onUpdate(activeNote.id, { tags: updatedTags });
+                }
+              });
+              if (suggestions.length === 0) alert('No new tag suggestions found');
+            }} title="Auto-suggest tags">✨</button>
+          </div>
         </div>
-        </div>
-        
-        {/* Bi-Directional Links Section */}
-        {(forwardLinks?.length > 0 || backlinks?.length > 0) && (
-          <div style={{ marginTop: '24px', paddingTop: '16px', borderTop: '1px solid var(--border)' }}>
-            {forwardLinks?.length > 0 && (
-              <div style={{ marginBottom: backlinks?.length > 0 ? '16px' : '0' }}>
-                <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>🔗 Linked Mentions</span>
-                <div style={{ display: 'flex', gap: '8px', marginTop: '8px', flexWrap: 'wrap' }}>
-                  {forwardLinks.map(link => (
-                    <button key={link.id} onClick={() => onNavigate(link.id)} className="tag-pill" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <Layers size={10} /> {link.title || 'Untitled'}
-                    </button>
-                  ))}
-                </div>
+
+        {showPaperSettings && (
+          <div className="settings-popover paper-settings" style={{ position: 'fixed', bottom: '80px', right: '24px', zIndex: 100 }}>
+            <div className="settings-panel">
+              <h4>Paper Style</h4>
+              <div className="paper-types-grid">
+                {Object.entries(PAPER_TYPES).map(([id, type]) => (
+                  <button
+                    key={id}
+                    className={`paper-type-btn ${paperType === id ? 'active' : ''}`}
+                    onClick={() => togglePaperType(id)}
+                    title={type.description}
+                  >
+                    <div className="paper-preview" style={{ 
+                      background: `repeating-linear-gradient(transparent, transparent ${type.spacing || 5}px, var(--text-muted) ${type.spacing || 5}px, var(--text-muted) calc(${type.spacing || 5}px + 1px))` 
+                    }} />
+                    <span>{type.name}</span>
+                  </button>
+                ))}
               </div>
-            )}
-            {backlinks?.length > 0 && (
-              <div>
-                <span style={{ fontSize: '11px', fontWeight: 600, color: 'var(--text-muted)', textTransform: 'uppercase', letterSpacing: '0.5px' }}>🔙 Backlinks</span>
-                <div style={{ display: 'flex', gap: '8px', marginTop: '8px', flexWrap: 'wrap' }}>
-                  {backlinks.map(link => (
-                    <button key={link.id} onClick={() => onNavigate(link.id)} className="tag-pill" style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                      <Layers size={10} /> {link.title || 'Untitled'}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            )}
+            </div>
           </div>
         )}
+
+        {showLayoutSettings && (
+          <div className="settings-popover layout-settings" style={{ position: 'fixed', bottom: '80px', right: '24px', zIndex: 100 }}>
+            <div className="settings-panel">
+              <h4>Canvas Size</h4>
+              <div className="canvas-sizes-grid">
+                {Object.entries(CANVAS_SIZES).map(([id, size]) => (
+                  <button
+                    key={id}
+                    className={`canvas-size-btn ${canvasSize === id ? 'active' : ''}`}
+                    onClick={() => toggleCanvasSize(id)}
+                    title={`${size.width}${size.unit} × ${size.height}${size.unit}`}
+                  >
+                    <span>{size.name}</span>
+                    <small>{size.width}×{size.height}{size.unit}</small>
+                  </button>
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
+        
+        <style jsx>{`
+          .editor-container { flex: 1; overflow-y: auto; }
+          .note.digital-paper {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            box-shadow: var(--shadow);
+            position: relative;
+          }
+          .note.digital-paper.paper-ruled,
+          .note.digital-paper.paper-wideRuled,
+          .note.digital-paper.paper-narrowRuled,
+          .note.digital-paper.paper-cornell,
+          .note.digital-paper.paper-seyes,
+          .note.digital-paper.paper-checklist,
+          .note.digital-paper.paper-dualLayout {
+            background: transparent;
+          }
+          .note.digital-paper.paper-dotGrid,
+          .note.digital-paper.paper-graph,
+          .note.digital-paper.paper-isometric {
+            background: transparent;
+          }
+          .note.digital-paper.paper-storyboard,
+          .note.digital-paper.paper-logbook,
+          .note.digital-paper.paper-music {
+            background: transparent;
+          }
+          
+          /* Size classes */
+          .size-a4 { max-width: 794px; aspect-ratio: 1.414; }
+          .size-a5 { max-width: 560px; aspect-ratio: 1.414; }
+          .size-a6 { max-width: 397px; aspect-ratio: 1.414; }
+          .size-b5 { max-width: 665px; aspect-ratio: 1.42; }
+          .size-b6 { max-width: 472px; aspect-ratio: 1.408; }
+          .size-letter { max-width: 816px; aspect-ratio: 1.294; }
+          .size-legal { max-width: 816px; aspect-ratio: 1.647; }
+          .size-executive { max-width: 672px; aspect-ratio: 1.428; }
+          .size-square { aspect-ratio: 1; }
+          .size-landscape { max-width: 840px; aspect-ratio: 1.414; }
+          .size-portrait { max-width: 595px; aspect-ratio: 1.414; }
+          .size-pocket { max-width: 340px; aspect-ratio: 2; }
+          .size-passport { max-width: 333px; aspect-ratio: 1.42; }
+          .size-tabloid { max-width: 1056px; aspect-ratio: 1.545; }
+          
+          @media (max-width: 768px) {
+            .size-a4, .size-a5, .size-b5, .size-letter, .size-legal, .size-executive, .size-landscape, .size-tabloid {
+              max-width: 100%;
+              aspect-ratio: auto;
+              height: auto;
+            }
+          }
+          
+          .editor-content {
+            position: relative;
+            z-index: 10;
+          }
+          
+          .grammar-popover {
+            position: absolute;
+            bottom: 100%;
+            right: 0;
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 8px;
+            box-shadow: var(--shadow);
+            z-index: 100;
+            max-width: 300px;
+          }
+          .grammar-issue {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 4px 8px;
+            font-size: 12px;
+          }
+          .grammar-issue button {
+            padding: 2px 8px;
+            font-size: 11px;
+            background: var(--accent);
+            color: white;
+            border: none;
+            border-radius: 4px;
+            cursor: pointer;
+          }
+          
+          .settings-popover {
+            animation: slideUp 0.2s ease-out;
+          }
+          @keyframes slideUp {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+          }
+          .settings-panel {
+            background: var(--bg-card);
+            border: 1px solid var(--border);
+            border-radius: var(--radius);
+            padding: 16px;
+            min-width: 280px;
+            max-width: 360px;
+            box-shadow: var(--shadow);
+          }
+          .settings-panel h4 {
+            margin: 0 0 12px;
+            font-size: 14px;
+            font-weight: 600;
+            color: var(--text-main);
+          }
+          .paper-types-grid,
+          .canvas-sizes-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fill, minmax(80px, 1fr));
+            gap: 8px;
+          }
+          .paper-type-btn,
+          .canvas-size-btn {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 4px;
+            padding: 10px 8px;
+            border: 2px solid var(--border);
+            border-radius: 8px;
+            background: var(--bg-main);
+            cursor: pointer;
+            transition: all 0.2s;
+            font-size: 11px;
+          }
+          .paper-type-btn:hover,
+          .canvas-size-btn:hover {
+            border-color: var(--accent);
+            background: var(--bg-active);
+          }
+          .paper-type-btn.active,
+          .canvas-size-btn.active {
+            border-color: var(--accent);
+            background: rgba(var(--accent-rgb), 0.1);
+          }
+          .paper-preview {
+            width: 100%;
+            height: 40px;
+            border-radius: 4px;
+            background-size: 100% 20px;
+          }
+          .canvas-size-btn small {
+            color: var(--text-muted);
+            font-size: 10px;
+          }
+          
+          .note-cover-image {
+            border-radius: var(--radius) var(--radius) 0 0;
+          }
+          .cover-actions {
+            display: flex;
+            gap: 4px;
+          }
+        `}</style>
       </div>
     </div>
   );
 };
 
->>>>>>> b95ce7254a8b813cef834ed02a8364210c343079
 export default NoteEditor;

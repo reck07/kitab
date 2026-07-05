@@ -1,5 +1,5 @@
 {
-  "appId": "com.kitab.app",
+  "appId": "com.kitab.notes",
   "appName": "Kitab",
   "webDir": "dist",
   "server": {

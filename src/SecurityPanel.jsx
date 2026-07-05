@@ -1,0 +1,151 @@
+import { useState } from 'react';
+import { X, Lock, Shield, Key, Fingerprint, Eye, EyeOff, Timer } from 'lucide-react';
+import { isNoteLocked } from './crypto';
+import { isWebAuthnAvailable, registerBiometric, authenticateBiometric } from './webauthn';
+
+const SecurityPanel = ({ onClose, notes, activeNoteId, onLockNote, onUnlockNote, biometricEnabled, onBiometricToggle, autoLockTimeout, onAutoLockTimeoutChange }) => {
+  const activeNote = notes.find(n => n.id === activeNoteId);
+  const [passwordInput, setPasswordInput] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
+  const [passwordError, setPasswordError] = useState('');
+
+  if (!activeNote) return null;
+
+  const isLocked = isNoteLocked(activeNote);
+
+  const handleLockNote = async () => {
+    if (!passwordInput) {
+      setPasswordError('Please enter a password');
+      return;
+    }
+    if (passwordInput.length < 4) {
+      setPasswordError('Password must be at least 4 characters');
+      return;
+    }
+    await onLockNote(activeNote.id, passwordInput);
+    setPasswordInput('');
+    setPasswordError('');
+  };
+
+  const handleUnlockNote = async () => {
+    if (!passwordInput) {
+      setPasswordError('Please enter a password');
+      return;
+    }
+    const ok = await onUnlockNote(activeNote.id, passwordInput);
+    if (ok) {
+      setPasswordInput('');
+      setPasswordError('');
+    } else {
+      setPasswordError('Incorrect password');
+    }
+  };
+
+  return (
+    <div className="modal-overlay" onClick={onClose}>
+      <div className="security-modal" onClick={e => e.stopPropagation()}>
+        <div className="modal-header">
+          <h3><Shield size={18} /> Security & Privacy</h3>
+          <button className="btn-icon" onClick={onClose}><X size={20} /></button>
+        </div>
+        <div className="settings-content">
+          <section className="settings-section">
+            <h4><Lock size={16} /> Note Encryption</h4>
+            <div className="password-controls">
+              <div className="password-field">
+                <input 
+                  type={showPassword ? 'text' : 'password'} 
+                  placeholder={isLocked ? 'Enter password to unlock' : 'Set password for this note'}
+                  value={passwordInput}
+                  onChange={(e) => setPasswordInput(e.target.value)}
+                  className="password-input"
+                />
+                <button className="btn-icon" onClick={() => setShowPassword(!showPassword)}>
+                  {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                </button>
+              </div>
+              {passwordError && <div className="password-error">{passwordError}</div>}
+              <div className="password-actions">
+                {isLocked ? (
+                  <button className="btn-primary" onClick={handleUnlockNote}>
+                    <UnlockIcon size={14} /> Unlock Note
+                  </button>
+                ) : (
+                  <button className="btn-primary" onClick={handleLockNote}>
+                    <Lock size={14} /> Lock Note
+                  </button>
+                )}
+              </div>
+            </div>
+          </section>
+
+          <section className="settings-section">
+            <h4><Fingerprint size={16} /> Biometric Lock</h4>
+            <div className="setting-row">
+              <label className="toggle-label">
+                <input type="checkbox" checked={biometricEnabled} onChange={async (e) => {
+                  if (e.target.checked) {
+                    try {
+                      const avail = await isWebAuthnAvailable();
+                      if (!avail) { alert('Biometric authentication is not available on this device'); return; }
+                      await registerBiometric();
+                      onBiometricToggle(true);
+                      alert('Biometric registered successfully');
+                    } catch (err) {
+                      alert('Biometric registration failed: ' + err.message);
+                    }
+                  } else {
+                    localStorage.removeItem('webauthn_credential');
+                    onBiometricToggle(false);
+                  }
+                }} />
+                <span className="toggle-switch" />
+                <span>Use biometric authentication</span>
+              </label>
+              <p className="setting-hint">Requires device with fingerprint or face unlock support</p>
+            </div>
+          </section>
+
+          <section className="settings-section">
+            <h4><Timer size={16} /> Auto-Lock Timer</h4>
+            <div className="setting-row">
+              <select value={autoLockTimeout} onChange={(e) => onAutoLockTimeoutChange(Number(e.target.value))}>
+                <option value={1}>1 minute</option>
+                <option value={5}>5 minutes</option>
+                <option value={15}>15 minutes</option>
+                <option value={30}>30 minutes</option>
+                <option value={60}>1 hour</option>
+                <option value={0}>Never (not recommended)</option>
+              </select>
+            </div>
+          </section>
+
+          <section className="settings-section">
+            <h4><Key size={16} /> Encrypted Notes</h4>
+            <div className="encrypted-notes-list">
+              {notes.filter(n => isNoteLocked(n)).map(n => (
+                <div key={n.id} className="locked-note-item">
+                  <Lock size={14} />
+                  <span>{n.title || 'Untitled'}</span>
+                  <span className="locked-badge">🔒 Locked</span>
+                </div>
+              ))}
+              {notes.filter(n => isNoteLocked(n)).length === 0 && (
+                <p className="setting-hint">No notes are currently locked</p>
+              )}
+            </div>
+          </section>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+const UnlockIcon = ({ size }) => (
+  <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+    <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
+    <path d="M7 11V7a5 5 0 0 1 9.9-1" />
+  </svg>
+);
+
+export default SecurityPanel;

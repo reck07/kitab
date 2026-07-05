@@ -7,45 +7,14 @@
     "dev": "vite",
     "build": "vite build",
     "lint": "eslint .",
-<<<<<<< HEAD
     "preview": "vite preview",
     "test": "vitest run",
-    "test:watch": "vitest",
-    "static": "vite build",
-    "cap-sync": "npx cap sync",
-    "android": "npx cap open android",
-    "apk:sync": "npm run build && npx cap sync android"
+    "test:watch": "vitest"
   },
   "dependencies": {
-    "@capacitor/android": "^6.0.0",
-    "@capacitor/core": "^6.0.0",
-    "@supabase/supabase-js": "^2.106.1",
-    "lucide-react": "^0.454.0",
-    "react": "^18.3.1",
-    "react-dom": "^18.3.1",
-    "tesseract.js": "^5.1.1"
-  },
-  "devDependencies": {
-    "@capacitor/cli": "^6.0.0",
-    "@eslint/js": "^9.13.0",
-    "@testing-library/jest-dom": "^6.9.1",
-    "@testing-library/react": "^16.3.2",
-    "@testing-library/user-event": "^14.6.1",
-    "@types/react": "^18.3.12",
-    "@types/react-dom": "^18.3.1",
-    "@vitejs/plugin-react": "^4.3.3",
-    "@vitest/coverage-v8": "^4.1.7",
-    "eslint": "^9.13.0",
-    "eslint-plugin-react-hooks": "^5.0.0",
-    "eslint-plugin-react-refresh": "^0.4.14",
-    "globals": "^15.11.0",
-    "jsdom": "^29.1.1",
-    "vite": "^5.4.10",
-    "vitest": "^4.1.7"
-=======
-    "preview": "vite preview"
-  },
-  "dependencies": {
+    "@capacitor/android": "^8.4.1",
+    "@capacitor/cli": "^8.4.1",
+    "@capacitor/core": "^8.4.1",
     "@supabase/supabase-js": "^2.50.2",
     "lucide-react": "^1.14.0",
     "react": "^19.2.5",
@@ -54,6 +23,8 @@
   },
   "devDependencies": {
     "@eslint/js": "^10.0.1",
+    "@testing-library/jest-dom": "^6.9.1",
+    "@testing-library/react": "^16.3.2",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.1",
@@ -61,7 +32,8 @@
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.2",
     "globals": "^17.5.0",
-    "vite": "^8.0.10"
->>>>>>> b95ce7254a8b813cef834ed02a8364210c343079
+    "jsdom": "^29.1.1",
+    "vite": "^8.0.10",
+    "vitest": "^4.1.9"
   }
 }
