@@ -158,7 +158,7 @@ function App() {
     addPage, removePage, restoreNote, permanentlyDelete,
     handleTogglePin, handleToggleFavorite, handleToggleArchive,
     handleLockToggle, handleSecurityLock, handleSecurityUnlock,
-    handleEditorUpdate, handleRemoveTag,
+    handleEditorUpdate, handleRemoveTag, unlockNote,
     reorderNotes, saveAsTemplate, loadTemplates, createFromTemplate,
     setNotes,
   } = useNotes(user);
@@ -352,10 +352,8 @@ function App() {
     const note = notes.find(n => n.id === id);
     if (!note) return;
     if (isNoteLocked(note) && !unlockedContentById[id]) {
-      const password = window.prompt('Enter password to unlock this note');
-      if (!password) return;
-      const ok = await handleSecurityUnlock(id, password);
-      if (!ok) { alert('Incorrect password'); return; }
+      const ok = await unlockNote(note);
+      if (!ok) return;
     }
     setActiveNoteId(id);
     if (isMobile) { setIsEditorOpen(true); setIsSidebarOpen(false); }
