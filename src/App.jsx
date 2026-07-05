@@ -184,6 +184,8 @@ function App() {
   const [isSortDropdownVisible, setIsSortDropdownVisible] = useState(false);
   const [isTemplatePickerOpen, setIsTemplatePickerOpen] = useState(false);
   const [dragIndex, setDragIndex] = useState(null);
+  const [viewMode, setViewMode] = useState('list');
+  const [showViewSwitcher, setShowViewSwitcher] = useState(false);
 
   // Online/offline detection
   useEffect(() => {
@@ -291,6 +293,61 @@ function App() {
     } catch { alert('AI summary requires Supabase edge functions to be configured.'); }
   };
 
+  const handleGoogleDriveSave = async () => {
+    const note = notes.find(n => n.id === activeNoteId);
+    if (!note) { alert('Open a note first.'); return; }
+
+    const loadGIS = () => new Promise((resolve) => {
+      if (window.google?.accounts?.oauth2) { resolve(); return; }
+      const s = document.createElement('script');
+      s.src = 'https://accounts.google.com/gsi/client';
+      s.onload = resolve;
+      document.head.appendChild(s);
+    });
+
+    const content = `# ${note.title}\n\n${note.content?.replace(/<[^>]*>/g, '') || ''}`;
+    let clientId = localStorage.getItem('google_client_id');
+    if (!clientId) {
+      clientId = prompt('Enter your Google OAuth Client ID to enable Drive upload:');
+      if (!clientId) return;
+      localStorage.setItem('google_client_id', clientId);
+    }
+
+    try {
+      await loadGIS();
+      const tokenClient = google.accounts.oauth2.initTokenClient({
+        client_id: clientId,
+        scope: 'https://www.googleapis.com/auth/drive.file',
+        callback: async (resp) => {
+          if (resp.error) { alert('Google auth failed.'); return; }
+          const metadata = { name: `${note.title || 'untitled'}.md`, mimeType: 'text/markdown' };
+          const form = new FormData();
+          form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+          form.append('file', new Blob([content], { type: 'text/markdown' }));
+          try {
+            const result = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+              method: 'POST',
+              headers: { 'Authorization': `Bearer ${resp.access_token}` },
+              body: form,
+            });
+            if (result.ok) {
+              const data = await result.json();
+              alert(`Note saved to Google Drive! Open: https://drive.google.com/open?id=${data.id}`);
+            } else {
+              const err = await result.text();
+              alert('Upload failed: ' + err);
+            }
+          } catch (e) {
+            alert('Upload error: ' + e.message);
+          }
+        },
+      });
+      tokenClient.requestAccessToken();
+    } catch (e) {
+      alert('Google Drive error: ' + e.message);
+    }
+  };
+
   const handleNoteSelect = (id) => {
     const note = notes.find(n => n.id === id);
     if (!note) return;
@@ -348,17 +405,56 @@ function App() {
         <div className="loading-screen">Loading...</div>
       ) : isAuthenticated ? (
         <>
-          <Navbar
-            theme={theme}
-            onThemeChange={handleThemeChange}
-            onMenuToggle={() => setIsSidebarOpen(!isSidebarOpen)}
-            isMobile={isMobile}
-            isSidebarOpen={showSidebar}
+          <Navbar 
             user={user}
             onSignOut={handleSignOut}
             isGuest={isGuest}
             onLogin={clearGuestMode}
+            onGoogleDriveSave={handleGoogleDriveSave}
+            onToggleView={() => setShowViewSwitcher(!showViewSwitcher)}
           />
+
+          {showViewSwitcher && (
+            <>
+              <div className="view-switcher-backdrop" onClick={() => setShowViewSwitcher(false)} />
+              <div className="view-switcher-popover">
+                <div className="view-switcher-track">
+                  <div className={`view-slider ${viewMode === 'grid' ? 'grid' : viewMode === 'card' ? 'card' : ''}`} />
+                  <button className={`view-segment ${viewMode === 'list' ? 'active' : ''}`} onClick={() => { setViewMode('list'); setShowViewSwitcher(false); }} title="List View">
+                    <svg width="16" height="14" viewBox="0 0 16 14" fill="none">
+                      <rect x="0" y="0" width="16" height="2.2" rx="1.1" fill="currentColor"/>
+                      <rect x="0" y="4" width="16" height="2.2" rx="1.1" fill="currentColor"/>
+                      <rect x="0" y="8" width="16" height="2.2" rx="1.1" fill="currentColor"/>
+                      <rect x="0" y="12" width="16" height="2.2" rx="1.1" fill="currentColor"/>
+                    </svg>
+                  </button>
+                  <button className={`view-segment ${viewMode === 'grid' ? 'active' : ''}`} onClick={() => { setViewMode('grid'); setShowViewSwitcher(false); }} title="Grid View">
+                    <svg width="18" height="16" viewBox="0 0 18 16" fill="none">
+                      <rect x="0.5" y="0.5" width="7" height="6.5" rx="1.2" stroke="currentColor" strokeWidth="0.8" fill="none"/>
+                      <rect x="10.5" y="0.5" width="7" height="6.5" rx="1.2" stroke="currentColor" strokeWidth="0.8" fill="none"/>
+                      <rect x="0.5" y="9" width="7" height="6.5" rx="1.2" stroke="currentColor" strokeWidth="0.8" fill="none"/>
+                      <rect x="10.5" y="9" width="7" height="6.5" rx="1.2" stroke="currentColor" strokeWidth="0.8" fill="none"/>
+                      <rect x="1" y="1" width="6" height="5.5" rx="0.8" fill="currentColor" opacity="0.15"/>
+                      <rect x="11" y="1" width="6" height="5.5" rx="0.8" fill="currentColor" opacity="0.15"/>
+                      <rect x="1" y="9.5" width="6" height="5.5" rx="0.8" fill="currentColor" opacity="0.15"/>
+                      <rect x="11" y="9.5" width="6" height="5.5" rx="0.8" fill="currentColor" opacity="0.15"/>
+                    </svg>
+                  </button>
+                  <button className={`view-segment ${viewMode === 'card' ? 'active' : ''}`} onClick={() => { setViewMode('card'); setShowViewSwitcher(false); }} title="Card View">
+                    <svg width="18" height="16" viewBox="0 0 18 16" fill="none">
+                      <rect x="0.5" y="0.5" width="6" height="15" rx="1.2" stroke="currentColor" strokeWidth="0.7" fill="none"/>
+                      <rect x="1" y="1" width="5" height="14" rx="0.8" fill="currentColor" opacity="0.12"/>
+                      <rect x="8" y="2.5" width="9.5" height="2" rx="0.8" fill="currentColor" opacity="0.5"/>
+                      <rect x="8" y="6" width="7" height="1.5" rx="0.6" fill="currentColor" opacity="0.2"/>
+                      <rect x="8" y="8.5" width="8" height="1.5" rx="0.6" fill="currentColor" opacity="0.2"/>
+                      <rect x="8" y="11" width="5" height="1.5" rx="0.6" fill="currentColor" opacity="0.2"/>
+                      <rect x="8" y="13.5" width="9" height="1.5" rx="0.6" fill="currentColor" opacity="0.15"/>
+                    </svg>
+                  </button>
+                </div>
+              </div>
+            </>
+          )}
 
           <div className={`app-body ${isSidebarOpen ? 'sidebar-open' : ''} ${isEditorOpen ? 'editor-open' : ''}`} style={{ position: 'relative', display: 'flex', width: '100%', overflow: 'hidden' }}>
             <aside className={`sidebar ${showSidebar ? 'open' : ''}`} style={isMobile && showSidebar ? { position: 'absolute', zIndex: 1000, top: 0, bottom: 0, left: 0, width: '85%', maxWidth: '350px', backgroundColor: 'var(--bg-app)', boxShadow: '4px 0 24px rgba(0,0,0,0.5)' } : {}}>
@@ -398,7 +494,7 @@ function App() {
                   ))}
                 </div>
               </div>
-              <div className="note-list">
+              <div className={`note-list view-${viewMode}`}>
                 {filteredNotes.length === 0 && (
                   <div className="empty-state"><p>{searchQuery ? 'No matching notes found.' : showTrash ? 'Trash is empty.' : 'No notes yet. Create one!'}</p></div>
                 )}

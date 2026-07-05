@@ -1,5 +1,5 @@
 import { useRef, useEffect, useState } from 'react';
-import { List, Heading1, Heading2, MessageSquare, Mic, Share2, Lock, Pin, Star, Archive, X, ArrowLeft, Image as ImageIcon, Smile, Bot, SpellCheck, FileText, ChevronRight, CheckSquare, Layout, Trash2, RotateCcw, FilePlus } from 'lucide-react';
+import { List, Heading1, Heading2, MessageSquare, Mic, Share2, Lock, Pin, Star, Archive, X, ArrowLeft, Image as ImageIcon, Smile, Bot, SpellCheck, FileText, ChevronRight, CheckSquare, Layout, Trash2, RotateCcw, FilePlus, Save, QrCode, Calendar, Plus, Circle } from 'lucide-react';
 import Tesseract from 'tesseract.js';
 import { PAPER_TYPES, CANVAS_SIZES, getPaperType } from './paperTypes';
 import { suggestTags } from './autoTag';
@@ -12,7 +12,6 @@ const NoteEditor = ({
   activeNote, 
   onUpdate, 
   onRemoveTag, 
-  onSummarize, 
   charCount, 
   wordCount, 
   onCloseEditor,
@@ -43,6 +42,20 @@ const NoteEditor = ({
   const [showPaperSettings, setShowPaperSettings] = useState(false);
   const [showLayoutSettings, setShowLayoutSettings] = useState(false);
   const [wikilinks, setWikilinks] = useState([]);
+  const [justSaved, setJustSaved] = useState(false);
+  const [showQRCode, setShowQRCode] = useState(false);
+  const [showCalendar, setShowCalendar] = useState(false);
+  const [showTodo, setShowTodo] = useState(false);
+  const [qrText, setQrText] = useState('');
+  const [todoItems, setTodoItems] = useState([]);
+  const [todoInput, setTodoInput] = useState('');
+  const [audioBlob, setAudioBlob] = useState(null);
+  const [isRecordingAudio, setIsRecordingAudio] = useState(false);
+  const mediaRecorderRef = useRef(null);
+  const recognitionRef = useRef(null);
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [refreshParticles, setRefreshParticles] = useState([]);
+  const [refreshMessage, setRefreshMessage] = useState('');
 
   // Update editor content only when the active note changes
   useEffect(() => {
@@ -69,52 +82,20 @@ const NoteEditor = ({
 
   const handleBlur = () => {
     if (!editorRef.current) return;
-    // Restore [[wikilinks]] from clickable anchors before saving
     const restored = stripWikilinks(editorRef.current.innerHTML);
     if (restored !== editorRef.current.innerHTML) {
       editorRef.current.innerHTML = restored;
     }
-    const element = editorRef.current;
-    
-    const emailRegex = /([a-zA-Z0-9._-]+@[a-zA-Z0-9._-]+\.[a-zA-Z0-9._-]+)/g;
-    const urlRegex = /(https?:\/\/[^\s<]+)/g;
-    const wwwRegex = /(^|\s)(www\.[^\s<]+)/g;
-    
-    const walker = document.createTreeWalker(element, NodeFilter.SHOW_TEXT, null, false);
+  };
 
-    let nodesToReplace = [];
-    let node;
-    while((node = walker.nextNode())) {
-      if (node.parentNode && node.parentNode.closest && node.parentNode.closest('a')) {
-        continue;
-      }
-      if (node.nodeValue.match(emailRegex) || node.nodeValue.match(urlRegex) || node.nodeValue.match(wwwRegex)) {
-        nodesToReplace.push(node);
-      }
-    }
-
-    let changed = false;
-    nodesToReplace.forEach(textNode => {
-      let text = textNode.nodeValue;
-      let replaced = text
-        .replace(urlRegex, '<a href="$1" target="_blank" style="color: var(--accent); text-decoration: underline; cursor: pointer;">$1</a>')
-        .replace(wwwRegex, '$1<a href="https://$2" target="_blank" style="color: var(--accent); text-decoration: underline; cursor: pointer;">$2</a>')
-        .replace(emailRegex, '<a href="mailto:$1" target="_blank" style="color: var(--accent); text-decoration: underline; cursor: pointer;">$1</a>');
-        
-      if (replaced !== text) {
-        const tempDiv = document.createElement('div');
-        tempDiv.innerHTML = replaced;
-        while (tempDiv.firstChild) {
-          textNode.parentNode.insertBefore(tempDiv.firstChild, textNode);
-        }
-        textNode.parentNode.removeChild(textNode);
-        changed = true;
-      }
-    });
-
-    if (changed) {
-      onUpdate(activeNote.id, { content: element.innerHTML });
-    }
+  const handleSave = () => {
+    if (!editorRef.current) return;
+    const content = stripWikilinks(editorRef.current.innerHTML);
+    onUpdate(activeNote.id, { content });
+    setJustSaved(true);
+    setTimeout(() => {
+      setJustSaved(false);
+    }, 2000);
   };
 
   const handleTagInput = (e) => {
@@ -128,18 +109,92 @@ const NoteEditor = ({
     }
   };
 
-  const handleVoiceInput = () => {
-    const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
-    if (!SpeechRecognition) {
-      alert("Voice input is not supported in this browser. Try Chrome or Edge.");
+  const handleVoiceInput = async () => {
+    if (isRecording) {
+      recognitionRef.current?.stop();
+      setIsRecording(false);
+      return;
+    }
+
+    const insertTranscript = (transcript) => {
+      if (!editorRef.current || !transcript) return;
+      const currentHTML = editorRef.current.innerHTML;
+      const needsSpace = currentHTML.length > 0 && !currentHTML.endsWith(' ') && currentHTML !== '<br>';
+      const updatedHTML = (currentHTML === '<br>' ? '' : currentHTML) + (needsSpace ? ' ' : '') + transcript;
+      onUpdate(activeNote.id, { content: updatedHTML });
+    };
+
+    const appendToEditor = (text, isFinal) => {
+      if (!editorRef.current) return;
+      if (isFinal) {
+        const finalContent = editorRef.current.innerHTML.replace(/<span class="interim-transcript">.*<\/span>$/, '') + text;
+        editorRef.current.innerHTML = finalContent;
+        onUpdate(activeNote.id, { content: finalContent });
+      } else {
+        const existingInterim = editorRef.current.querySelector('span.interim-transcript');
+        if (existingInterim) {
+          existingInterim.textContent = text;
+        } else {
+          editorRef.current.innerHTML += `<span class="interim-transcript" style="color:var(--text-muted);">${text}</span>`;
+        }
+      }
+    };
+
+    // Try native Capacitor plugin first (mobile)
+    try {
+      const { SpeechRecognition } = await import('@capacitor-community/speech-recognition');
+      const available = (await SpeechRecognition.isAvailable()).available;
+      if (available) {
+        const permResult = await SpeechRecognition.hasPermission();
+        if (!permResult.permission) {
+          const reqResult = await SpeechRecognition.requestPermission();
+          if (reqResult.permission !== 'granted') {
+            alert('Microphone permission denied. Allow it in Android Settings.');
+            return;
+          }
+        }
+
+        setIsRecording(true);
+        const resultListener = await SpeechRecognition.addListener('onResult', (data) => {
+          if (data.matches && data.matches.length > 0) {
+            insertTranscript(data.matches[0]);
+          }
+        });
+        const endListener = await SpeechRecognition.addListener('onEnd', () => {
+          setIsRecording(false);
+          resultListener.remove();
+          endListener.remove();
+        });
+        const errorListener = await SpeechRecognition.addListener('onError', (data) => {
+          setIsRecording(false);
+          if (data.error === 'no-match') return;
+          alert('Voice input error: ' + (data.errorMessage || data.error));
+          resultListener.remove();
+          endListener.remove();
+          errorListener.remove();
+        });
+
+        await SpeechRecognition.start({ language: 'en-US', prompt: false });
+        return;
+      }
+    } catch (e) {
+      // Capacitor plugin not available, fall through to Web API
+    }
+
+    // Fallback: Web Speech API (browser)
+    const SpeechRecognitionAPI = window.SpeechRecognition || window.webkitSpeechRecognition;
+    if (!SpeechRecognitionAPI) {
+      alert("Voice input is not supported in this browser or device.");
       return;
     }
 
     try {
-      const recognition = new SpeechRecognition();
+      const recognition = new SpeechRecognitionAPI();
+      recognitionRef.current = recognition;
       recognition.lang = 'en-US';
-      recognition.continuous = false;
-
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      
       recognition.onstart = () => setIsRecording(true);
       recognition.onend = () => setIsRecording(false);
       recognition.onerror = (event) => {
@@ -152,13 +207,20 @@ const NoteEditor = ({
           alert('Voice input error: ' + event.error);
         }
       };
-      
+
       recognition.onresult = (event) => {
-        const transcript = event.results[0][0].transcript;
-        const currentHTML = editorRef.current.innerHTML;
-        const needsSpace = currentHTML.length > 0 && !currentHTML.endsWith(' ');
-        const updatedHTML = currentHTML + (needsSpace ? ' ' : '') + transcript;
-        onUpdate(activeNote.id, { content: updatedHTML });
+        let interim_transcript = '';
+        let final_transcript = '';
+
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          if (event.results[i].isFinal) {
+            final_transcript += event.results[i][0].transcript;
+          } else {
+            interim_transcript += event.results[i][0].transcript;
+          }
+        }
+
+        appendToEditor(final_transcript, true);
       };
 
       recognition.start();
@@ -181,6 +243,113 @@ const NoteEditor = ({
       await navigator.clipboard.writeText(`${shareData.title}\n\n${shareData.text}`);
       alert("Copied to clipboard!");
     }
+  };
+
+  const handleInsertQRCode = () => {
+    if (!qrText || !editorRef.current) return;
+    const url = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(qrText)}`;
+    editorRef.current.focus();
+    document.execCommand('insertImage', false, url);
+    onUpdate(activeNote.id, { content: editorRef.current.innerHTML });
+    setShowQRCode(false);
+    setQrText('');
+  };
+
+  const handleAddTodo = () => {
+    if (!todoInput.trim()) return;
+    setTodoItems([...todoItems, { id: Date.now(), text: todoInput, done: false }]);
+    setTodoInput('');
+  };
+
+  const handleToggleTodo = (id) => {
+    setTodoItems(todoItems.map(item => item.id === id ? { ...item, done: !item.done } : item));
+  };
+
+  const handleRemoveTodo = (id) => {
+    setTodoItems(todoItems.filter(item => item.id !== id));
+  };
+
+  const handleInsertTodo = () => {
+    if (!editorRef.current) return;
+    const list = todoItems.map(item =>
+      `<label style="display:flex;align-items:center;gap:6px;cursor:pointer;"><input type="radio" style="accent-color:var(--accent);" ${item.done ? 'checked' : ''} />${item.text}</label>`
+    ).join('');
+    editorRef.current.focus();
+    document.execCommand('insertHTML', false, `<div style="margin:4px 0;">${list}</div>`);
+    onUpdate(activeNote.id, { content: editorRef.current.innerHTML });
+    setShowTodo(false);
+  };
+
+  const handleInsertDate = (dateStr) => {
+    if (!editorRef.current) return;
+    editorRef.current.focus();
+    document.execCommand('insertText', false, dateStr);
+    onUpdate(activeNote.id, { content: editorRef.current.innerHTML });
+    setShowCalendar(false);
+  };
+
+  const handleAudioAttach = async () => {
+    if (isRecordingAudio) {
+      mediaRecorderRef.current?.stop();
+      setIsRecordingAudio(false);
+      return;
+    }
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const mediaRecorder = new MediaRecorder(stream);
+      mediaRecorderRef.current = mediaRecorder;
+      const chunks = [];
+      mediaRecorder.ondataavailable = (e) => { if (e.data.size > 0) chunks.push(e.data); };
+      mediaRecorder.onstop = () => {
+        stream.getTracks().forEach(t => t.stop());
+        const blob = new Blob(chunks, { type: 'audio/webm' });
+        setAudioBlob(blob);
+        const url = URL.createObjectURL(blob);
+        if (editorRef.current) {
+          editorRef.current.focus();
+          document.execCommand('insertHTML', false, `<audio controls src="${url}" style="width:100%;max-width:300px;height:40px;"></audio>`);
+          onUpdate(activeNote.id, { content: editorRef.current.innerHTML });
+        }
+      };
+      mediaRecorder.start();
+      setIsRecordingAudio(true);
+    } catch (e) {
+      alert('Microphone access denied: ' + e.message);
+    }
+  };
+
+  const handleMindRefresh = () => {
+    if (isRefreshing) return;
+    const messages = [
+      '🌸 A fresh mind creates better ideas.',
+      '🌸 Breathe. Reset. Create.',
+      '🌸 Let your thoughts bloom like petals.',
+      '🌸 Clarity begins with a calm mind.',
+      '🌸 Every refresh is a new beginning.',
+      '🌸 Soft minds make strong ideas.',
+      '🌸 You are exactly where you need to be.',
+    ];
+    setRefreshMessage(messages[Math.floor(Math.random() * messages.length)]);
+    const petals = [];
+    for (let i = 0; i < 25; i++) {
+      petals.push({
+        id: i,
+        left: Math.random() * 100,
+        delay: Math.random() * 2,
+        duration: 3 + Math.random() * 4,
+        size: 8 + Math.random() * 10,
+        sway: Math.random() * 80 - 40,
+        rotation: Math.random() * 360,
+        hue: 320 + Math.random() * 40,
+      });
+    }
+    setRefreshParticles(petals);
+    setIsRefreshing(true);
+    setTimeout(() => {
+      setIsRefreshing(false);
+      setRefreshParticles([]);
+      setRefreshMessage('');
+    }, 5000);
   };
 
   const handleImageUpload = (e) => {
@@ -313,6 +482,7 @@ const NoteEditor = ({
           <ChevronRight size={14} style={{ transform: isToolsOpen ? 'rotate(0deg)' : 'rotate(180deg)', transition: 'transform 0.3s' }} />
         </button>
         <div className="text-tools">
+          <span className="toolbar-meta">{charCount}c · {wordCount}w · {readingTime}m</span>
           <select 
             className="font-size-select"
             value={activeNote.fontSize || '17px'}
@@ -338,21 +508,74 @@ const NoteEditor = ({
           <button className="btn-icon sm" onClick={handleShare} title="Share"><Share2 size={15} /></button>
           <button className="btn-icon sm" onClick={() => fileInputRef.current?.click()} title="Insert Image"><ImageIcon size={15} /></button>
           <input type="file" ref={fileInputRef} accept="image/*" onChange={handleImageUpload} style={{ display: 'none' }} />
+          <button className={`btn-icon sm ${isRefreshing ? 'refreshing' : ''}`} onClick={handleMindRefresh} title="🌸 Mind Refresh" style={{ color: 'var(--text-muted)' }}><RotateCcw size={15} /></button>
+          <div className="toolbar-divider"></div>
+          <button className="btn-icon sm" onClick={() => { setShowQRCode(!showQRCode); setShowCalendar(false); setShowTodo(false); }} title="QR Code"><QrCode size={15} /></button>
+          <button className="btn-icon sm" onClick={() => { setShowCalendar(!showCalendar); setShowQRCode(false); setShowTodo(false); }} title="Calendar"><Calendar size={15} /></button>
+          <button className="btn-icon sm" onClick={() => { setShowTodo(!showTodo); setShowQRCode(false); setShowCalendar(false); }} title="Todo List"><CheckSquare size={15} /></button>
+          <button className="btn-icon sm" onClick={handleAudioAttach} title={isRecordingAudio ? 'Stop Recording' : 'Attach Voice'} style={{ color: isRecordingAudio ? 'var(--danger)' : 'var(--text-muted)' }}><Mic size={15} /></button>
           <div className="toolbar-divider"></div>
           <button className="btn-icon sm" onClick={handleGrammarCheck} title="Grammar Check"><SpellCheck size={15} /></button>
           <button className="btn-icon sm" onClick={() => setShowEmojiPicker(!showEmojiPicker)} title="Emoji"><Smile size={15} /></button>
           <div className="toolbar-divider"></div>
           <button className="btn-icon sm" onClick={() => setShowPaperSettings(!showPaperSettings)} title="Paper"><FileText size={15} /></button>
           <button className="btn-icon sm" onClick={() => setShowLayoutSettings(!showLayoutSettings)} title="Size"><Layout size={15} /></button>
-          <button className="btn-icon sm" onClick={onSummarize} title="AI"><Bot size={15} /></button>
+          <button className="btn-icon sm" onClick={() => window.open('https://gemini.google.com', '_blank')} title="AI"><Bot size={15} /></button>
           <button className="btn-icon sm" onClick={onToggleFocus} title="Focus Mode" style={{ opacity: focusMode ? 1 : 0.5 }}><Layout size={15} /></button>
           <div className="toolbar-divider"></div>
           <button className="btn-icon sm" onClick={onSaveTemplate} title="Save as Template"><FileText size={15} /></button>
           <button className="btn-icon sm" onClick={onLoadTemplate} title="New from Template"><FilePlus size={15} /></button>
+          <div className="toolbar-divider"></div>
+          {!activeNote.isRecycled && (<>
+            <button className="btn-icon sm" onClick={() => onTogglePin?.(activeNote.id)} title={activeNote.isPinned ? 'Unpin' : 'Pin'} style={{ color: activeNote.isPinned ? 'var(--accent)' : undefined }}>
+              <Pin size={13} fill={activeNote.isPinned ? 'currentColor' : 'none'} />
+            </button>
+            <button className="btn-icon sm" onClick={() => onToggleFavorite?.(activeNote.id)} title={activeNote.isFavorite ? 'Unfavorite' : 'Favorite'} style={{ color: activeNote.isFavorite ? 'var(--accent)' : undefined }}>
+              <Star size={13} fill={activeNote.isFavorite ? 'currentColor' : 'none'} />
+            </button>
+            <button className="btn-icon sm" onClick={() => onToggleArchive?.(activeNote.id)} title={activeNote.isArchived ? 'Unarchive' : 'Archive'}>
+              <Archive size={13} />
+            </button>
+            <button className="btn-icon sm" onClick={() => onDelete?.(activeNote.id)} title="Move to trash">
+              <Trash2 size={13} />
+            </button>
+            {activeNote.isLocked && <Lock size={12} />}
+            <div className="toolbar-divider"></div>
+          </>)}
           {isRecording && <span className="rec-badge">🔴</span>}
           {isScanningImage && <span className="scan-badge">📸</span>}
         </div>
       </div>
+
+      {isRefreshing && (
+        <div className="mind-refresh-overlay">
+          <div className="refresh-flash" />
+          {refreshParticles.map(p => (
+            <div key={p.id} className="cherry-petal" style={{
+              left: `${p.left}%`,
+              width: p.size,
+              height: p.size * 0.7,
+              background: `hsl(${p.hue}, 70%, 75%)`,
+              animationDelay: `${p.delay}s`,
+              animationDuration: `${p.duration}s`,
+              '--sway': `${p.sway}px`,
+              '--rotation': `${p.rotation}deg`,
+            }} />
+          ))}
+          <div className="sparkle-area">
+            {[...Array(6)].map((_, i) => (
+              <div key={i} className="refresh-sparkle" style={{
+                left: `${20 + Math.random() * 60}%`,
+                top: `${20 + Math.random() * 40}%`,
+                animationDelay: `${0.5 + Math.random() * 1.5}s`,
+              }} />
+            ))}
+          </div>
+          {refreshMessage && (
+            <div className="refresh-message">{refreshMessage}</div>
+          )}
+        </div>
+      )}
 
         {showEmojiPicker && (
           <div className="emoji-picker">
@@ -367,6 +590,62 @@ const NoteEditor = ({
           </div>
         )}
 
+        {showQRCode && (
+          <div className="settings-popover" style={{ position: 'fixed', bottom: '80px', right: '80px', zIndex: 100 }}>
+            <div className="settings-panel" style={{ padding: 12, minWidth: 200 }}>
+              <h4 style={{ margin: '0 0 8px', fontSize: 13 }}>QR Code</h4>
+              <input type="text" value={qrText} onChange={e => setQrText(e.target.value)} placeholder="Enter text or URL" style={{ width: '100%', padding: '4px 6px', fontSize: 12, marginBottom: 8, border: '1px solid var(--border)', borderRadius: 4, background: 'var(--bg-main)', color: 'inherit' }} />
+              <div style={{ display: 'flex', gap: 4 }}>
+                <button className="btn-icon sm" onClick={handleInsertQRCode} title="Insert" disabled={!qrText}><Plus size={14} /></button>
+              </div>
+              {qrText && <img src={`https://api.qrserver.com/v1/create-qr-code/?size=120x120&data=${encodeURIComponent(qrText)}`} alt="QR" style={{ marginTop: 8, width: 120, height: 120, borderRadius: 4 }} />}
+            </div>
+          </div>
+        )}
+
+        {showCalendar && (
+          <div className="settings-popover" style={{ position: 'fixed', bottom: '80px', right: '80px', zIndex: 100 }}>
+            <div className="settings-panel" style={{ padding: 12, minWidth: 200 }}>
+              <h4 style={{ margin: '0 0 8px', fontSize: 13 }}>Insert Date</h4>
+              <input type="date" onChange={e => { if (e.target.value) handleInsertDate(new Date(e.target.value).toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric', year: 'numeric' })); }} style={{ width: '100%', padding: '4px 6px', fontSize: 12, border: '1px solid var(--border)', borderRadius: 4, background: 'var(--bg-main)', color: 'inherit' }} />
+              <div style={{ display: 'flex', gap: 4, marginTop: 8, flexWrap: 'wrap' }}>
+                {['Today','Tomorrow','Next Week'].map(label => {
+                  const d = new Date();
+                  if (label === 'Tomorrow') d.setDate(d.getDate() + 1);
+                  if (label === 'Next Week') d.setDate(d.getDate() + 7);
+                  const str = d.toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' });
+                  return <button key={label} className="btn-icon sm" onClick={() => handleInsertDate(str)} title={label} style={{ fontSize: 11 }}>{label}</button>;
+                })}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {showTodo && (
+          <div className="settings-popover" style={{ position: 'fixed', bottom: '80px', right: '80px', zIndex: 100 }}>
+            <div className="settings-panel" style={{ padding: 12, minWidth: 220 }}>
+              <h4 style={{ margin: '0 0 8px', fontSize: 13 }}>Todo List</h4>
+              <div style={{ display: 'flex', gap: 4, marginBottom: 8 }}>
+                <input type="text" value={todoInput} onChange={e => setTodoInput(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') handleAddTodo(); }} placeholder="Add item..." style={{ flex: 1, padding: '4px 6px', fontSize: 12, border: '1px solid var(--border)', borderRadius: 4, background: 'var(--bg-main)', color: 'inherit' }} />
+                <button className="btn-icon sm" onClick={handleAddTodo}><Plus size={14} /></button>
+              </div>
+              <div style={{ maxHeight: 160, overflowY: 'auto', marginBottom: 8 }}>
+                {todoItems.map(item => (
+                  <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '2px 0', fontSize: 12 }}>
+                    <Circle size={12} style={{ cursor: 'pointer', color: item.done ? 'var(--accent)' : 'var(--text-muted)', fill: item.done ? 'var(--accent)' : 'none' }} onClick={() => handleToggleTodo(item.id)} />
+                    <span style={{ flex: 1, textDecoration: item.done ? 'line-through' : 'none', opacity: item.done ? 0.5 : 1 }}>{item.text}</span>
+                    <button className="btn-icon sm" onClick={() => handleRemoveTodo(item.id)} style={{ width: 18, height: 18 }}><X size={10} /></button>
+                  </div>
+                ))}
+                {todoItems.length === 0 && <span style={{ fontSize: 11, color: 'var(--text-muted)' }}>No items yet</span>}
+              </div>
+              {todoItems.length > 0 && (
+                <button className="btn-icon sm" onClick={handleInsertTodo} title="Insert into note" style={{ fontSize: 11, width: '100%' }}>Insert into Note</button>
+              )}
+            </div>
+          </div>
+        )}
+
           <div className="editor-container" style={{ 
         maxWidth: '100%', 
         width: '100%',
@@ -375,44 +654,28 @@ const NoteEditor = ({
         flexDirection: 'column',
       }}>
         <div className="editor-header-meta">
-          <div className="char-counter">{charCount}c · {wordCount}w · {readingTime}m</div>
-          <div className="note-meta">
-            {activeNote.isRecycled ? (
-              <>
-                <button className="btn-link" onClick={() => onRestore?.(activeNote.id)} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                  <RotateCcw size={14} /> Restore
-                </button>
-                <button className="btn-link danger" onClick={() => onPermanentDelete?.(activeNote.id)} style={{ display: 'inline-flex', alignItems: 'center', gap: 4 }}>
-                  <Trash2 size={14} /> Delete
-                </button>
-              </>
-            ) : (
-              <>
-                <button className="btn-icon sm" onClick={() => onTogglePin?.(activeNote.id)} title={activeNote.isPinned ? 'Unpin' : 'Pin'} style={{ color: activeNote.isPinned ? 'var(--accent)' : undefined }}>
-                  <Pin size={12} fill={activeNote.isPinned ? 'currentColor' : 'none'} />
-                </button>
-                <button className="btn-icon sm" onClick={() => onToggleFavorite?.(activeNote.id)} title={activeNote.isFavorite ? 'Unfavorite' : 'Favorite'} style={{ color: activeNote.isFavorite ? 'var(--accent)' : undefined }}>
-                  <Star size={12} fill={activeNote.isFavorite ? 'currentColor' : 'none'} />
-                </button>
-                <button className="btn-icon sm" onClick={() => onToggleArchive?.(activeNote.id)} title={activeNote.isArchived ? 'Unarchive' : 'Archive'}>
-                  <Archive size={12} />
-                </button>
-                <button className="btn-icon sm" onClick={() => onDelete?.(activeNote.id)} title="Move to trash" style={{ color: 'var(--text-muted)' }}>
-                  <Trash2 size={12} />
-                </button>
-              </>
-            )}
-            {activeNote.isLocked && <Lock size={12} />}
+          <div className="title-editor">
+            <input 
+              type="text" 
+              className="note-title-input"
+              value={activeNote.title || ''} 
+              onChange={(e) => {
+                const newTitle = e.target.value;
+                onUpdate(activeNote.id, { title: newTitle });
+              }}
+              onKeyDown={(e) => {
+                e.stopPropagation();
+              }}
+              placeholder="Untitled Note"
+            />
           </div>
-        </div>
-        {activeNote.isRecycled && (
-          <div className="trash-notice">
-            This note is in trash. <button className="btn-link" onClick={() => onRestore?.(activeNote.id)}>Restore</button> or <button className="btn-link danger" onClick={() => onPermanentDelete?.(activeNote.id)}>delete permanently</button>
-          </div>
-        )}
-        {!activeNote.isRecycled && (
-          <div className="tags-bar">
-            <div className="tags-display">
+          {justSaved && (
+            <div className="save-indicator" style={{ color: 'var(--accent)', fontSize: '12px', marginRight: '12px', transition: 'opacity 0.5s', animation: 'fadeInOut 2s' }}>
+              Saved!
+            </div>
+          )}
+          {!activeNote.isRecycled && (
+            <div className="tags-inline">
               {activeNote.tags?.map(tag => (
                 <span key={tag} className="tag-badge">
                   {tag}
@@ -429,106 +692,107 @@ const NoteEditor = ({
                   }
                 });
                 if (suggestions.length === 0) alert('No new tag suggestions found');
-              }} title="Auto-suggest tags">✨</button>
+              }} title="Auto-suggest tags"><span style={{ fontSize: 13 }}>✨</span></button>
             </div>
+          )}
+        </div>
+        {activeNote.isRecycled && (
+          <div className="trash-notice">
+            This note is in trash. <button className="btn-link" onClick={() => onRestore?.(activeNote.id)}>Restore</button> or <button className="btn-link danger" onClick={() => onPermanentDelete?.(activeNote.id)}>delete permanently</button>
           </div>
         )}
+
         {activeNote.coverImage && (
-          <div className="note-cover-wrapper" style={{ marginBottom: '0.75rem', borderRadius: 'var(--radius)', overflow: 'hidden', position: 'relative' }}>
-            <img 
-              src={activeNote.coverImage} 
-              alt="Note cover" 
-              className="note-cover-image"
-              style={{ width: '100%', height: '160px', objectFit: 'cover', display: 'block' }}
-            />
-            <div className="cover-actions">
-              <button className="btn-icon" onClick={handleCoverUpload} title="Change Cover"><ImageIcon size={16} /></button>
-              <button className="btn-icon" onClick={removeCover} title="Remove Cover"><X size={16} /></button>
-            </div>
-            <input type="file" ref={coverInputRef} accept="image/*" onChange={handleCoverUpload} style={{ display: 'none' }} />
-            <style jsx>{`
-              .note-cover-wrapper { position: relative; }
-              .cover-actions { position: absolute; top: 8px; right: 8px; display: flex; gap: 4px; opacity: 0; transition: opacity 0.2s; }
-              .note-cover-wrapper:hover .cover-actions { opacity: 1; }
-            `}</style>
-          </div>
-        )}
-
-        <div 
-          className={`note digital-paper paper-${paperType} size-${canvasSize.toLowerCase()}`}
-          style={{
-            fontSize: activeNote.fontSize || '17px',
-            lineHeight: 1.6,
-            fontFamily: activeNote.fontFamily || 'system',
-            minHeight: '500px',
-            position: 'relative',
-          }}
-        >
-          <PaperBackground paperType={paperType} canvasSize={canvasSize} />
-          
-          <div 
-            ref={editorRef}
-            contentEditable
-            suppressContentEditableWarning
-            onBlur={handleBlur}
-            onClick={handleEditorClick}
-            className="editor-content"
-            spellCheck="true"
-            data-grammar-matches={JSON.stringify(grammarMatches)}
-            style={{
-              position: 'relative',
-              zIndex: 10,
-              padding: `${paper.marginTop}px ${paper.marginRight}px ${paper.marginBottom}px ${paper.marginLeft}px`,
-              minHeight: '400px',
-              outline: 'none',
-              whiteSpace: 'pre-wrap',
-              wordWrap: 'break-word',
-            }}
-          />
-          
-          {grammarMatches.length > 0 && (
-            <div className="grammar-popover">
-              {grammarMatches.slice(0, 5).map((match, i) => (
-                <div key={i} className="grammar-issue">
-                  <span>{match.message}</span>
-                  <button onClick={() => {
-                    const text = editorRef.current.innerText;
-                    const replacement = match.replacements?.[0]?.value || '';
-                    const newText = text.replace(match.context.text, replacement);
-                    editorRef.current.innerText = newText;
-                    onUpdate(activeNote.id, { content: editorRef.current.innerHTML });
-                    setGrammarMatches(grammarMatches.filter((_, idx) => idx !== i));
-                  }}>
-                    Fix
-                  </button>
+              <div className="note-cover-wrapper" style={{ marginBottom: '0.75rem', borderRadius: 'var(--radius)', overflow: 'hidden', position: 'relative' }}>
+                <img 
+                  src={activeNote.coverImage} 
+                  alt="Note cover" 
+                  className="note-cover-image"
+                  style={{ width: '100%', height: '160px', objectFit: 'cover', display: 'block' }}
+                />
+                <div className="cover-actions">
+                  <button className="btn-icon" onClick={handleCoverUpload} title="Change Cover"><ImageIcon size={16} /></button>
+                  <button className="btn-icon" onClick={removeCover} title="Remove Cover"><X size={16} /></button>
                 </div>
-              ))}
-            </div>
-          )}
-        </div>
+                <input type="file" ref={coverInputRef} accept="image/*" onChange={handleCoverUpload} style={{ display: 'none' }} />
+              </div>
+            )}
 
-        <div className="editor-footer">
-          {forwardLinks?.length > 0 && (
-            <div className="links-bar" style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', padding: '4px 0', fontSize: '12px', color: 'var(--text-muted)' }}>
-              <span>→</span>
-              {forwardLinks.map(link => (
-                <button key={link.id} className="btn-icon sm" onClick={() => onNavigate?.(link.id)} title={link.title} style={{ fontSize: '12px', gap: '2px' }}>
-                  {link.title}
-                </button>
-              ))}
+            <div 
+              className={`note digital-paper paper-${paperType} size-${canvasSize.toLowerCase()}`}
+              style={{
+                fontSize: activeNote.fontSize || '17px',
+                lineHeight: 1.6,
+                fontFamily: activeNote.fontFamily || 'system',
+                minHeight: '500px',
+                position: 'relative',
+              }}
+            >
+              <PaperBackground paperType={paperType} canvasSize={canvasSize} />
+              
+              <div 
+                ref={editorRef}
+                contentEditable
+                suppressContentEditableWarning
+                onBlur={handleBlur}
+                onClick={handleEditorClick}
+                className="editor-content"
+                spellCheck="true"
+                data-grammar-matches={JSON.stringify(grammarMatches)}
+                style={{
+                  position: 'relative',
+                  zIndex: 10,
+                  padding: `${paper.marginTop}px ${paper.marginRight}px ${paper.marginBottom}px ${paper.marginLeft}px`,
+                  minHeight: '400px',
+                  outline: 'none',
+                  whiteSpace: 'pre-wrap',
+                  wordWrap: 'break-word',
+                }}
+              />
+              
+              {grammarMatches.length > 0 && (
+                <div className="grammar-popover">
+                  {grammarMatches.slice(0, 5).map((match, i) => (
+                    <div key={i} className="grammar-issue">
+                      <span>{match.message}</span>
+                      <button onClick={() => {
+                        const text = editorRef.current.innerText;
+                        const replacement = match.replacements?.[0]?.value || '';
+                        const newText = text.replace(match.context.text, replacement);
+                        editorRef.current.innerText = newText;
+                        onUpdate(activeNote.id, { content: editorRef.current.innerHTML });
+                        setGrammarMatches(grammarMatches.filter((_, idx) => idx !== i));
+                      }}>
+                        Fix
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
-          )}
-          {backlinks?.length > 0 && (
-            <div className="links-bar" style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', padding: '4px 0', fontSize: '12px', color: 'var(--text-muted)' }}>
-              <span>←</span>
-              {backlinks.map(link => (
-                <button key={link.id} className="btn-icon sm" onClick={() => onNavigate?.(link.id)} title={link.title} style={{ fontSize: '12px', gap: '2px' }}>
-                  {link.title}
-                </button>
-              ))}
+
+            <div className="editor-footer">
+              {forwardLinks?.length > 0 && (
+                <div className="links-bar" style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', padding: '4px 0', fontSize: '12px', color: 'var(--text-muted)' }}>
+                  <span>→</span>
+                  {forwardLinks.map(link => (
+                    <button key={link.id} className="btn-icon sm" onClick={() => onNavigate?.(link.id)} title={link.title} style={{ fontSize: '12px', gap: '2px' }}>
+                      {link.title}
+                    </button>
+                  ))}
+                </div>
+              )}
+              {backlinks?.length > 0 && (
+                <div className="links-bar" style={{ display: 'flex', gap: '6px', flexWrap: 'wrap', padding: '4px 0', fontSize: '12px', color: 'var(--text-muted)' }}>
+                  <span>←</span>
+                  {backlinks.map(link => (
+                    <button key={link.id} className="btn-icon sm" onClick={() => onNavigate?.(link.id)} title={link.title} style={{ fontSize: '12px', gap: '2px' }}>
+                      {link.title}
+                    </button>
+                  ))}
+                </div>
+              )}
             </div>
-          )}
-        </div>
 
         {showPaperSettings && (
           <div className="settings-popover paper-settings" style={{ position: 'fixed', bottom: '80px', right: '24px', zIndex: 100 }}>
@@ -730,6 +994,79 @@ const NoteEditor = ({
           .cover-actions {
             display: flex;
             gap: 4px;
+          }
+          
+          @keyframes petalFall {
+            0% { transform: translateY(-20px) translateX(0) rotate(0deg); opacity: 1; }
+            100% { transform: translateY(100vh) translateX(var(--sway, 20px)) rotate(var(--rotation, 360deg)); opacity: 0.2; }
+          }
+          @keyframes sparklePop {
+            0% { transform: scale(0) rotate(0deg); opacity: 1; }
+            50% { transform: scale(1.2) rotate(180deg); opacity: 0.8; }
+            100% { transform: scale(0) rotate(360deg); opacity: 0; }
+          }
+          @keyframes refreshFlash {
+            0% { opacity: 0.6; }
+            100% { opacity: 0; }
+          }
+          @keyframes refreshSpin {
+            from { transform: rotate(0deg); }
+            to { transform: rotate(360deg); }
+          }
+          @keyframes messageSlide {
+            0% { opacity: 0; transform: translateY(20px) scale(0.9); }
+            20% { opacity: 1; transform: translateY(0) scale(1); }
+            80% { opacity: 1; transform: translateY(0) scale(1); }
+            100% { opacity: 0; transform: translateY(-10px) scale(0.95); }
+          }
+          .mind-refresh-overlay {
+            position: fixed;
+            inset: 0;
+            z-index: 9999;
+            pointer-events: none;
+            overflow: hidden;
+          }
+          .refresh-flash {
+            position: absolute;
+            inset: 0;
+            background: radial-gradient(ellipse at center, rgba(255,200,230,0.25) 0%, transparent 70%);
+            animation: refreshFlash 1.5s ease-out forwards;
+          }
+          .cherry-petal {
+            position: absolute;
+            top: -20px;
+            border-radius: 50% 0 50% 0;
+            opacity: 0.8;
+            animation: petalFall linear forwards;
+          }
+          .sparkle-area {
+            position: absolute;
+            inset: 0;
+          }
+          .refresh-sparkle {
+            position: absolute;
+            width: 6px;
+            height: 6px;
+            background: #ffd700;
+            border-radius: 50%;
+            box-shadow: 0 0 6px #ffd700, 0 0 12px rgba(255,215,0,0.4);
+            animation: sparklePop 1.2s ease-out forwards;
+          }
+          .refresh-message {
+            position: absolute;
+            bottom: 20%;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 16px;
+            font-weight: 500;
+            color: #d4729a;
+            text-shadow: 0 2px 12px rgba(212,114,154,0.2);
+            white-space: nowrap;
+            animation: messageSlide 4s ease forwards;
+            letter-spacing: 0.02em;
+          }
+          .refreshing svg {
+            animation: refreshSpin 0.6s ease-out;
           }
         `}</style>
       </div>

@@ -2,6 +2,7 @@ import { useState, useRef, useEffect } from 'react';
 import { X, GripHorizontal } from 'lucide-react';
 
 const Calculator = ({ onClose }) => {
+  // It's recommended to use a safe math expression parser instead of new Function()
   const [position, setPosition] = useState({ x: window.innerWidth - 320, y: 80 });
   const [isDragging, setIsDragging] = useState(false);
   const dragStart = useRef({ x: 0, y: 0 });
@@ -37,7 +38,11 @@ const Calculator = ({ onClose }) => {
     if (val === 'C') setInput('');
     else if (val === '=') {
       try {
+        // Using new Function() is a security risk, similar to eval().
+        // Replace with a safe math expression parser library like math.js or expr-eval.
+        // Example with a hypothetical safeEval function:
         const result = new Function('return ' + input.replace(/×/g, '*').replace(/÷/g, '/'))();
+        // const result = safeEval(input.replace(/×/g, '*').replace(/÷/g, '/'));
         setInput(String(result));
       } catch {
         setInput('Error');

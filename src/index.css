@@ -81,65 +81,10 @@ body {
   overflow: hidden;
 }
 
-/* Navbar */
-.app-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  padding: 12px 24px;
-  background: var(--bg-glass, rgba(255, 255, 255, 0.8));
-  backdrop-filter: blur(16px);
-  -webkit-backdrop-filter: blur(16px);
-  border-bottom: 1px solid var(--border);
-  z-index: 50;
-  transition: var(--transition);
-  position: relative;
-}
+/* Navbar - see App.css for Braun-inspired styling */
+.app-header { position: relative; z-index: 50; }
 
-[data-theme='dark'] .app-header { background: rgba(15, 23, 42, 0.8); }
-[data-theme='coffee'] .app-header { background: rgba(92, 67, 53, 0.8); }
-
-.premium-logo {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  cursor: pointer;
-  user-select: none;
-}
-
-.logo-icon-wrapper {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  width: 36px;
-  height: 36px;
-  border-radius: 10px;
-  background: linear-gradient(135deg, var(--accent), var(--accent-hover));
-  color: white;
-  box-shadow: 0 4px 12px var(--highlight);
-  transition: all 0.3s cubic-bezier(0.175, 0.885, 0.32, 1.275);
-}
-
-.premium-logo:hover .logo-icon-wrapper {
-  transform: translateY(-2px) scale(1.05) rotate(-5deg);
-  box-shadow: 0 6px 16px var(--highlight);
-}
-
-.premium-logo .logo-text {
-  font-family: 'Inter', system-ui, sans-serif;
-  font-size: 22px;
-  font-weight: 800;
-  letter-spacing: -0.5px;
-  background: linear-gradient(to bottom right, var(--text-main), var(--text-muted));
-  -webkit-background-clip: text;
-  -webkit-text-fill-color: transparent;
-  transition: opacity 0.2s;
-}
-
-.premium-logo:hover .logo-text {
-  opacity: 0.8;
-}
-
+/* Date/Time Display */
 .date-time-display {
   font-size: 14px;
   color: var(--text-muted);
@@ -518,9 +463,9 @@ body {
 .font-size-select {
   padding: 6px 10px;
   border-radius: 6px;
-  border: 1px solid var(--border);
-  background: var(--bg-nav);
-  color: inherit;
+  border: none;
+  background: #000;
+  color: #fff;
   font-size: 13px;
   outline: none;
   cursor: pointer;
