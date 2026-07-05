@@ -838,7 +838,7 @@ const NoteEditor = ({
           </div>
         )}
         
-        <style jsx>{`
+        <style>{`
           .editor-container { flex: 1; overflow-y: auto; }
           .note.digital-paper {
             background: var(--bg-card);

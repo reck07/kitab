@@ -71,9 +71,9 @@ const SecurityPanel = ({ onClose, notes, activeNoteId, onLockNote, onUnlockNote,
               </div>
               {passwordError && <div className="password-error">{passwordError}</div>}
               <div className="password-actions">
-                {isLocked && !password ? (
+                {isLocked ? (
                   <button className="btn-primary" onClick={handleUnlockNote}>
-                    <UnlockIcon size={14} /> Unlock Note
+                    <Unlock size={14} /> Unlock Note
                   </button>
                 ) : (
                   <button className="btn-primary" onClick={handleLockNote}>
