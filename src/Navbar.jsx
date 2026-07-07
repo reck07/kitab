@@ -29,15 +29,7 @@ const Navbar = ({ user, onSignOut, isGuest, onLogin, onGoogleDriveSave, onToggle
     <header className="app-header">
       <div className="header-casing">
         <div className="brand-area">
-          <div className="brand-top">
-            <svg className="brand-mark" viewBox="0 0 24 24" width="22" height="22" fill="none" xmlns="http://www.w3.org/2000/svg">
-              <path d="M5 3v18" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/>
-              <path d="M6 12l12-8" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/>
-              <path d="M6 12l12 8" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/>
-              <circle cx="19" cy="5" r="1.8" fill="#6366f1"/>
-            </svg>
-            <h1 className="brand-label">kitāb</h1>
-          </div>
+          <h1 className="brand-label">kitāb</h1>
           <div className="brand-divider" />
           <span className="brand-sub">the Reckoner</span>
         </div>

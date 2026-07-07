@@ -1581,24 +1581,21 @@ body {
   flex-shrink: 0;
   display: flex;
   flex-direction: column;
+  justify-content: center;
   align-items: flex-start;
   line-height: 1;
   gap: 2px;
+  cursor: default;
+  text-shadow: 0 0 1px rgba(255,255,255,0.1);
+  transition: transform 0.2s ease;
 }
 
-.brand-top {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-}
-
-.brand-mark {
-  color: #444;
-  flex-shrink: 0;
+.brand-area:hover {
+  transform: scale(1.02);
 }
 
 .brand-label {
-  font-family: 'Helvetica Neue', 'Inter', system-ui, sans-serif;
+  font-family: 'Georgia', 'Palatino', 'Times New Roman', serif;
   font-size: 18px;
   font-weight: 600;
   color: #2a2a2a;
@@ -1615,12 +1612,13 @@ body {
 }
 
 .brand-sub {
-  font-family: 'Georgia', 'Palatino', 'Times New Roman', serif;
+  font-family: 'Helvetica Neue', 'Inter', system-ui, sans-serif;
   font-size: 9.5px;
+  font-weight: 300;
   font-style: italic;
   color: #999;
   margin: 0;
-  letter-spacing: 0.06em;
+  letter-spacing: 0.1em;
   line-height: 1;
   text-transform: lowercase;
 }
@@ -1629,6 +1627,8 @@ body {
   display: flex;
   align-items: flex-end;
   gap: 20px;
+  padding-left: 18px;
+  border-left: 1px solid rgba(0,0,0,0.08);
 }
 
 .button-unit {
