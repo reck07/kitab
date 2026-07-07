@@ -8,6 +8,7 @@ const defaultActions = [
   { id: 'drive', label: 'Backup to Drive', shortcut: '', icon: '☁️', action: 'backupDrive' },
   { id: 'view-list', label: 'List View', shortcut: '', icon: '📋', action: 'setViewList' },
   { id: 'view-grid', label: 'Grid View', shortcut: '', icon: '📐', action: 'setViewGrid' },
+  { id: 'view-honeycomb', label: 'Honeycomb View', shortcut: '', icon: '🔶', action: 'setViewHoneycomb' },
   { id: 'graph', label: 'Knowledge Graph', shortcut: '', icon: '🔗', action: 'toggleGraph' },
   { id: 'sort-latest', label: 'Sort by Latest', shortcut: '', icon: '🕐', action: 'sortLatest' },
   { id: 'sort-oldest', label: 'Sort by Oldest', shortcut: '', icon: '🕑', action: 'sortOldest' },

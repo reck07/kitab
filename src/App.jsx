@@ -301,6 +301,7 @@ function App() {
       case 'backupDrive': handleGoogleDriveSave(); break;
       case 'setViewList': setViewMode('list'); break;
       case 'setViewGrid': setViewMode('grid'); break;
+      case 'setViewHoneycomb': setViewMode('honeycomb'); break;
       case 'toggleGraph': setShowGraph(p => !p); break;
       case 'sortLatest': setSortOrder('latest'); break;
       case 'sortOldest': setSortOrder('oldest'); break;
@@ -516,7 +517,7 @@ function App() {
               <div className="view-switcher-backdrop" onClick={() => setShowViewSwitcher(false)} />
               <div className="view-switcher-popover">
                 <div className="view-switcher-track">
-                  <div className={`view-slider ${viewMode === 'grid' ? 'grid' : viewMode === 'card' ? 'card' : ''}`} />
+                  <div className={`view-slider ${viewMode === 'grid' ? 'grid' : viewMode === 'honeycomb' ? 'honeycomb' : ''}`} />
                   <button className={`view-segment ${viewMode === 'list' ? 'active' : ''}`} onClick={() => { setViewMode('list'); setShowViewSwitcher(false); }} title="List View">
                     <svg width="16" height="14" viewBox="0 0 16 14" fill="none">
                       <rect x="0" y="0" width="16" height="2.2" rx="1.1" fill="currentColor"/>
@@ -537,15 +538,10 @@ function App() {
                       <rect x="11" y="9.5" width="6" height="5.5" rx="0.8" fill="currentColor" opacity="0.15"/>
                     </svg>
                   </button>
-                  <button className={`view-segment ${viewMode === 'card' ? 'active' : ''}`} onClick={() => { setViewMode('card'); setShowViewSwitcher(false); }} title="Card View">
+                  <button className={`view-segment ${viewMode === 'honeycomb' ? 'active' : ''}`} onClick={() => { setViewMode('honeycomb'); setShowViewSwitcher(false); }} title="Honeycomb View">
                     <svg width="18" height="16" viewBox="0 0 18 16" fill="none">
-                      <rect x="0.5" y="0.5" width="6" height="15" rx="1.2" stroke="currentColor" strokeWidth="0.7" fill="none"/>
-                      <rect x="1" y="1" width="5" height="14" rx="0.8" fill="currentColor" opacity="0.12"/>
-                      <rect x="8" y="2.5" width="9.5" height="2" rx="0.8" fill="currentColor" opacity="0.5"/>
-                      <rect x="8" y="6" width="7" height="1.5" rx="0.6" fill="currentColor" opacity="0.2"/>
-                      <rect x="8" y="8.5" width="8" height="1.5" rx="0.6" fill="currentColor" opacity="0.2"/>
-                      <rect x="8" y="11" width="5" height="1.5" rx="0.6" fill="currentColor" opacity="0.2"/>
-                      <rect x="8" y="13.5" width="9" height="1.5" rx="0.6" fill="currentColor" opacity="0.15"/>
+                      <polygon points="9,1 16,5 16,12 9,16 2,12 2,5" stroke="currentColor" strokeWidth="0.8" fill="none" strokeLinejoin="round"/>
+                      <polygon points="9,1 16,5 16,12 9,16 2,12 2,5" stroke="currentColor" strokeWidth="0.3" fill="currentColor" fillOpacity="0.12" strokeLinejoin="round"/>
                     </svg>
                   </button>
                 </div>

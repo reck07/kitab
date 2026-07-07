@@ -2018,7 +2018,7 @@ body {
   transform: translateX(44px);
 }
 
-.view-slider.card {
+.view-slider.honeycomb {
   transform: translateX(88px);
 }
 
@@ -2271,6 +2271,77 @@ body {
 
 .note-list[data-view="card"] .note-card .card-tags {
   display: none;
+}
+
+/* ===== HONEYCOMB VIEW ===== */
+.note-list[data-view="honeycomb"] {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+  gap: 20px 16px;
+  padding: 20px;
+  align-items: start;
+}
+
+.note-list[data-view="honeycomb"] .note-card-wrap {
+  overflow: visible !important;
+}
+
+.note-list[data-view="honeycomb"] .note-card {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  margin-bottom: 0 !important;
+  border: none !important;
+  background: none !important;
+  padding: 0;
+  cursor: pointer;
+  transition: transform 0.25s ease;
+}
+
+.note-list[data-view="honeycomb"] .note-card:hover {
+  transform: scale(1.05);
+}
+
+.note-list[data-view="honeycomb"] .note-card::before {
+  content: '';
+  width: 72px;
+  height: 82px;
+  background: var(--bg-card);
+  clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
+  border: 1.5px solid var(--border);
+  transition: background 0.2s, border-color 0.2s;
+  flex-shrink: 0;
+}
+
+.note-list[data-view="honeycomb"] .note-card:hover::before {
+  background: var(--accent);
+  border-color: var(--accent);
+}
+
+.note-list[data-view="honeycomb"] .note-card h3 {
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-muted);
+  margin: 8px 0 0;
+  padding: 0 4px;
+  max-width: 100px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  line-height: 1.3;
+}
+
+.note-list[data-view="honeycomb"] .note-card .note-date {
+  display: none;
+}
+
+.note-list[data-view="honeycomb"] .note-card .note-preview,
+.note-list[data-view="honeycomb"] .note-card .note-card-icons,
+.note-list[data-view="honeycomb"] .note-card .card-tags,
+.note-list[data-view="honeycomb"] .note-card > div[style*="backgroundImage"],
+.note-list[data-view="honeycomb"] .note-card .note-card-icons {
+  display: none !important;
 }
 
 
