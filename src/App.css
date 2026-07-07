@@ -90,6 +90,11 @@ body {
   overflow: hidden;
 }
 
+[data-theme="coffee"] .app-layout {
+  filter: sepia(6%) brightness(0.94);
+  transition: filter 0.5s ease;
+}
+
 .app-body {
   display: flex;
   flex: 1;

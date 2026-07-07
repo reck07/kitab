@@ -297,7 +297,7 @@ function App() {
       case 'newNote': addPage(); break;
       case 'searchNotes': document.querySelector('.search-input')?.focus(); break;
       case 'toggleFocus': setFocusMode(p => !p); break;
-      case 'toggleTheme': handleThemeChange(theme === 'light' ? 'dark' : 'light'); break;
+      case 'toggleTheme': handleThemeChange(theme === 'light' ? 'coffee' : 'light'); break;
       case 'backupDrive': handleGoogleDriveSave(); break;
       case 'setViewList': setViewMode('list'); break;
       case 'setViewGrid': setViewMode('grid'); break;
@@ -624,7 +624,7 @@ function App() {
                   focusMode={focusMode}
                   onSaveTemplate={saveAsTemplate}
                   onLoadTemplate={() => setIsTemplatePickerOpen(true)}
-                  onThemeChange={() => handleThemeChange(theme === 'light' ? 'dark' : 'light')}
+                  onThemeChange={() => handleThemeChange(theme === 'light' ? 'coffee' : 'light')}
                   theme={theme}
                   allTags={allTags}
                 />
