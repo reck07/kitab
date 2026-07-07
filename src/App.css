@@ -2283,64 +2283,69 @@ body {
   display: none;
 }
 
-/* ===== HONEYCOMB VIEW ===== */
+/* ===== TIMELINE VIEW ===== */
 .note-list[data-view="honeycomb"] {
-  display: grid;
-  grid-template-columns: repeat(auto-fill, 70px);
-  gap: 4px;
-  padding: 24px 20px;
-  justify-content: center;
+  position: relative;
+  padding: 40px 20px;
+  overflow-y: auto;
+}
+
+.note-list[data-view="honeycomb"]::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 2px;
+  background: linear-gradient(180deg, transparent 0%, var(--border) 10%, var(--border) 90%, transparent 100%);
+  border-radius: 2px;
 }
 
 .note-list[data-view="honeycomb"] .note-card-wrap {
   overflow: visible !important;
+  margin-bottom: 32px;
+  position: relative;
+}
+
+.note-list[data-view="honeycomb"] .note-card-wrap:last-child {
+  margin-bottom: 0;
 }
 
 .note-list[data-view="honeycomb"] .note-card {
   display: flex;
   flex-direction: row;
   align-items: center;
-  gap: 6px;
+  justify-content: center;
   margin-bottom: 0 !important;
   border: none !important;
   background: none !important;
   padding: 0;
   cursor: pointer;
-  position: relative;
-  z-index: 1;
-}
-
-.note-list[data-view="honeycomb"] .note-card:hover {
-  z-index: 2;
-}
-
-.note-list[data-view="honeycomb"] .note-card:active {
-  transform: none;
-}
-
-.note-list[data-view="honeycomb"] .note-card-wrap:nth-child(odd) {
-  margin-top: 18px;
+  gap: 40px;
 }
 
 .note-list[data-view="honeycomb"] .hexagon-icon {
-  width: 48px;
-  height: 54px;
+  width: 56px;
+  height: 64px;
   clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
-  transition: transform 0.25s ease;
-  box-shadow: 0 3px 8px rgba(0,0,0,0.18);
+  position: relative;
+  z-index: 2;
+  transition: transform 0.3s ease, box-shadow 0.3s ease;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.2);
 }
 
 .note-list[data-view="honeycomb"] .note-card:hover .hexagon-icon {
-  transform: scale(1.1);
-  box-shadow: 0 5px 16px rgba(0,0,0,0.3);
+  transform: scale(1.12);
+  box-shadow: 0 8px 24px rgba(0,0,0,0.35);
 }
 
 .note-list[data-view="honeycomb"] .hexagon-letter {
-  font-size: 20px;
+  font-size: 22px;
   font-weight: 700;
   color: #fff;
   text-shadow: 0 1px 3px rgba(0,0,0,0.3);
@@ -2349,28 +2354,98 @@ body {
 }
 
 .note-list[data-view="honeycomb"] .note-card h3 {
-  font-size: 11px;
-  font-weight: 500;
-  color: var(--text-muted);
-  margin: 0;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--text-main);
+  margin: 0 0 4px;
   padding: 0;
-  max-width: 90px;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
   line-height: 1.3;
 }
 
-.note-list[data-view="honeycomb"] .note-card .note-date {
-  display: none;
+.note-list[data-view="honeycomb"] .note-card .note-preview {
+  font-size: 11px;
+  color: var(--text-muted);
+  margin: 0 0 4px;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+  line-height: 1.4;
 }
 
-.note-list[data-view="honeycomb"] .note-card .note-preview,
+.note-list[data-view="honeycomb"] .note-card .note-date {
+  font-size: 10px;
+  color: var(--text-muted);
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  opacity: 0.7;
+}
+
 .note-list[data-view="honeycomb"] .note-card .note-card-icons,
 .note-list[data-view="honeycomb"] .note-card .card-tags,
 .note-list[data-view="honeycomb"] .note-card > div[style*="backgroundImage"] {
   display: none !important;
 }
+
+/* Content card adjacent to hexagon */
+.note-list[data-view="honeycomb"] .note-card .timeline-content {
+  display: flex;
+  flex-direction: column;
+  min-width: 160px;
+  max-width: 220px;
+  padding: 12px 14px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 2px 8px rgba(0,0,0,0.06);
+  transition: transform 0.25s ease, box-shadow 0.25s ease;
+}
+
+.note-list[data-view="honeycomb"] .note-card:hover .timeline-content {
+  transform: translateY(-2px);
+  box-shadow: 0 6px 20px rgba(0,0,0,0.1);
+}
+
+/* Alternating sides */
+.note-list[data-view="honeycomb"] .note-card-wrap:nth-child(odd) .note-card {
+  flex-direction: row;
+}
+
+.note-list[data-view="honeycomb"] .note-card-wrap:nth-child(odd) .timeline-content {
+  order: -1;
+  text-align: right;
+  align-items: flex-end;
+}
+
+.note-list[data-view="honeycomb"] .note-card-wrap:nth-child(even) .timeline-content {
+  text-align: left;
+  align-items: flex-start;
+}
+
+/* Entry animation */
+@keyframes timelineFadeIn {
+  from { opacity: 0; transform: translateY(30px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.note-list[data-view="honeycomb"] .note-card-wrap {
+  animation: timelineFadeIn 0.5s ease-out both;
+}
+
+.note-list[data-view="honeycomb"] .note-card-wrap:nth-child(1) { animation-delay: 0s; }
+.note-list[data-view="honeycomb"] .note-card-wrap:nth-child(2) { animation-delay: 0.1s; }
+.note-list[data-view="honeycomb"] .note-card-wrap:nth-child(3) { animation-delay: 0.2s; }
+.note-list[data-view="honeycomb"] .note-card-wrap:nth-child(4) { animation-delay: 0.3s; }
+.note-list[data-view="honeycomb"] .note-card-wrap:nth-child(5) { animation-delay: 0.4s; }
+.note-list[data-view="honeycomb"] .note-card-wrap:nth-child(6) { animation-delay: 0.5s; }
+.note-list[data-view="honeycomb"] .note-card-wrap:nth-child(7) { animation-delay: 0.6s; }
+.note-list[data-view="honeycomb"] .note-card-wrap:nth-child(8) { animation-delay: 0.7s; }
+.note-list[data-view="honeycomb"] .note-card-wrap:nth-child(9) { animation-delay: 0.8s; }
+.note-list[data-view="honeycomb"] .note-card-wrap:nth-child(10) { animation-delay: 0.9s; }
 
 /* Hide hexagon-icon in non-honeycomb views */
 .note-list:not([data-view="honeycomb"]) .hexagon-icon {
