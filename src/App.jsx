@@ -186,6 +186,15 @@ function App() {
   const [dragIndex, setDragIndex] = useState(null);
   const [viewMode, setViewMode] = useState('list');
   const [showViewSwitcher, setShowViewSwitcher] = useState(false);
+  const [driveSyncStatus, setDriveSyncStatus] = useState('idle');
+  const driveTokenRef = useRef(null);
+  const driveFolderRef = useRef(null);
+
+  // Load cached drive folder id
+  useEffect(() => {
+    const fid = localStorage.getItem('kitab_drive_folder_id');
+    if (fid) driveFolderRef.current = fid;
+  }, []);
 
   // Online/offline detection
   useEffect(() => {
@@ -293,10 +302,8 @@ function App() {
     } catch { alert('AI summary requires Supabase edge functions to be configured.'); }
   };
 
-  const handleGoogleDriveSave = async () => {
-    const note = notes.find(n => n.id === activeNoteId);
-    if (!note) { alert('Open a note first.'); return; }
-
+  const getDriveToken = async () => {
+    if (driveTokenRef.current) return driveTokenRef.current;
     const loadGIS = () => new Promise((resolve) => {
       if (window.google?.accounts?.oauth2) { resolve(); return; }
       const s = document.createElement('script');
@@ -304,47 +311,88 @@ function App() {
       s.onload = resolve;
       document.head.appendChild(s);
     });
-
-    const content = `# ${note.title}\n\n${note.content?.replace(/<[^>]*>/g, '') || ''}`;
     let clientId = localStorage.getItem('google_client_id');
     if (!clientId) {
-      clientId = prompt('Enter your Google OAuth Client ID to enable Drive upload:');
-      if (!clientId) return;
+      clientId = prompt('Enter your Google OAuth Client ID to enable Drive sync:');
+      if (!clientId) return null;
       localStorage.setItem('google_client_id', clientId);
     }
-
-    try {
-      await loadGIS();
-      const tokenClient = google.accounts.oauth2.initTokenClient({
+    await loadGIS();
+    return new Promise((resolve) => {
+      const tc = google.accounts.oauth2.initTokenClient({
         client_id: clientId,
         scope: 'https://www.googleapis.com/auth/drive.file',
-        callback: async (resp) => {
-          if (resp.error) { alert('Google auth failed.'); return; }
-          const metadata = { name: `${note.title || 'untitled'}.md`, mimeType: 'text/markdown' };
-          const form = new FormData();
-          form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
-          form.append('file', new Blob([content], { type: 'text/markdown' }));
-          try {
-            const result = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
-              method: 'POST',
-              headers: { 'Authorization': `Bearer ${resp.access_token}` },
-              body: form,
-            });
-            if (result.ok) {
-              const data = await result.json();
-              alert(`Note saved to Google Drive! Open: https://drive.google.com/open?id=${data.id}`);
-            } else {
-              const err = await result.text();
-              alert('Upload failed: ' + err);
-            }
-          } catch (e) {
-            alert('Upload error: ' + e.message);
-          }
+        callback: (resp) => {
+          if (resp.error) { resolve(null); return; }
+          driveTokenRef.current = resp.access_token;
+          setTimeout(() => { driveTokenRef.current = null; }, 300000);
+          resolve(resp.access_token);
         },
       });
-      tokenClient.requestAccessToken();
+      tc.requestAccessToken();
+    });
+  };
+
+  const ensureDriveFolder = async (token) => {
+    if (driveFolderRef.current) return driveFolderRef.current;
+    const list = await fetch(`https://www.googleapis.com/drive/v3/files?q=name='kitāb' and mimeType='application/vnd.google-apps.folder' and trashed=false&fields=files(id)`, {
+      headers: { Authorization: `Bearer ${token}` },
+    });
+    const data = await list.json();
+    if (data.files?.length > 0) {
+      driveFolderRef.current = data.files[0].id;
+      localStorage.setItem('kitab_drive_folder_id', data.files[0].id);
+      return data.files[0].id;
+    }
+    const create = await fetch('https://www.googleapis.com/drive/v3/files', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'application/json' },
+      body: JSON.stringify({ name: 'kitāb', mimeType: 'application/vnd.google-apps.folder' }),
+    });
+    const folder = await create.json();
+    driveFolderRef.current = folder.id;
+    localStorage.setItem('kitab_drive_folder_id', folder.id);
+    return folder.id;
+  };
+
+  const uploadNoteToDrive = async (note, token, folderId) => {
+    const content = `# ${note.title}\n\n${note.content?.replace(/<[^>]*>/g, '') || ''}`;
+    const metadata = { name: `${note.title || 'untitled'}.md`, mimeType: 'text/markdown', parents: [folderId] };
+    const form = new FormData();
+    form.append('metadata', new Blob([JSON.stringify(metadata)], { type: 'application/json' }));
+    form.append('file', new Blob([content], { type: 'text/markdown' }));
+    const result = await fetch('https://www.googleapis.com/upload/drive/v3/files?uploadType=multipart', {
+      method: 'POST',
+      headers: { Authorization: `Bearer ${token}` },
+      body: form,
+    });
+    if (!result.ok) { const e = await result.text(); throw new Error(e); }
+    return result.json();
+  };
+
+  const handleGoogleDriveSave = async (noteId) => {
+    const note = notes.find(n => n.id === (noteId || activeNoteId));
+    if (!note) return;
+    setDriveSyncStatus('syncing');
+    try {
+      const token = await getDriveToken();
+      if (!token) { setDriveSyncStatus('error'); return; }
+      const folderId = await ensureDriveFolder(token);
+      await uploadNoteToDrive(note, token, folderId);
+      setDriveSyncStatus('synced');
+      setTimeout(() => setDriveSyncStatus(prev => prev === 'synced' ? 'idle' : prev), 2000);
     } catch (e) {
-      alert('Google Drive error: ' + e.message);
+      setDriveSyncStatus('error');
+      setTimeout(() => setDriveSyncStatus(prev => prev === 'error' ? 'idle' : prev), 3000);
+    }
+  };
+
+  // Auto-sync to Drive after local save (if Drive is authorized)
+  const handleEditorUpdateWithDrive = (id, fields) => {
+    handleEditorUpdate(id, fields);
+    if (driveFolderRef.current || localStorage.getItem('google_client_id')) {
+      clearTimeout(window._driveSyncTimer);
+      window._driveSyncTimer = setTimeout(() => handleGoogleDriveSave(id), 2000);
     }
   };
 
@@ -415,6 +463,7 @@ function App() {
             isGuest={isGuest}
             onLogin={clearGuestMode}
             onGoogleDriveSave={handleGoogleDriveSave}
+            driveSyncStatus={driveSyncStatus}
             onToggleView={() => setShowViewSwitcher(!showViewSwitcher)}
             onNewNote={addPage}
           />
@@ -515,7 +564,7 @@ function App() {
               {activeNoteForEditor ? (
                 <NoteEditor
                   activeNote={activeNoteForEditor}
-                  onUpdate={handleEditorUpdate}
+                  onUpdate={handleEditorUpdateWithDrive}
                   onDelete={removePage}
                   onRestore={restoreNote}
                   onPermanentDelete={permanentlyDelete}

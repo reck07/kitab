@@ -1,14 +1,16 @@
 import { User, Cloud, Plus } from 'lucide-react';
 
-const Navbar = ({ user, onSignOut, isGuest, onLogin, onGoogleDriveSave, onToggleView, onNewNote }) => {
+const Navbar = ({ user, onSignOut, isGuest, onLogin, onGoogleDriveSave, onToggleView, onNewNote, driveSyncStatus }) => {
   const isSignedIn = !!user || isGuest;
   const firstLetter = user?.email?.charAt(0)?.toUpperCase();
+
+  const driveTitle = driveSyncStatus === 'syncing' ? 'Syncing...' : driveSyncStatus === 'error' ? 'Sync failed' : driveSyncStatus === 'synced' ? 'Synced!' : 'Upload to Google Drive';
 
   const buttons = [
     { icon: Plus, label: 'new', title: 'New Note', isNew: true },
     { label: 'view', title: 'View Notes', isView: true },
     { label: user ? 'sign out' : 'sign in', title: user ? 'Sign Out' : 'Sign In', isSignIn: true },
-    { icon: Cloud, label: 'drive', title: 'Upload to Google Drive', isDrive: true },
+    { icon: Cloud, label: 'drive', title: driveTitle, isDrive: true },
   ];
 
   const handleClick = (btn) => {
@@ -35,7 +37,7 @@ const Navbar = ({ user, onSignOut, isGuest, onLogin, onGoogleDriveSave, onToggle
             <div className="button-unit" key={btn.label}>
               <button
                 type="button"
-                className={`tactile-btn${btn.isSignIn ? ' sign-in-btn' : ''}${btn.isDrive ? ' drive-btn' : ''}`}
+                className={`tactile-btn${btn.isSignIn ? ' sign-in-btn' : ''}${btn.isDrive ? ' drive-btn' : ''}${btn.isDrive && driveSyncStatus === 'syncing' ? ' syncing' : ''}${btn.isDrive && driveSyncStatus === 'synced' ? ' synced' : ''}${btn.isDrive && driveSyncStatus === 'error' ? ' sync-error' : ''}`}
                 title={btn.title}
                 onClick={() => handleClick(btn)}
               >
