@@ -1583,6 +1583,18 @@ body {
   flex-direction: column;
   align-items: flex-start;
   line-height: 1;
+  gap: 2px;
+}
+
+.brand-top {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.brand-mark {
+  color: #444;
+  flex-shrink: 0;
 }
 
 .brand-label {
@@ -1595,13 +1607,22 @@ body {
   text-transform: lowercase;
 }
 
+.brand-divider {
+  width: 100%;
+  height: 1px;
+  background: linear-gradient(90deg, #bbb 0%, #ddd 50%, transparent 100%);
+  margin: 1px 0;
+}
+
 .brand-sub {
-  font-family: 'Brush Script MT', 'Segoe Script', 'Dancing Script', cursive;
-  font-size: 10px;
-  color: #888;
+  font-family: 'Georgia', 'Palatino', 'Times New Roman', serif;
+  font-size: 9.5px;
+  font-style: italic;
+  color: #999;
   margin: 0;
-  letter-spacing: 0.03em;
+  letter-spacing: 0.06em;
   line-height: 1;
+  text-transform: lowercase;
 }
 
 .controls-area {
@@ -1704,6 +1725,22 @@ body {
 }
 
 .tactile-btn.sync-error .btn-inner {
+  background: linear-gradient(135deg, #ef4444 0%, #f87171 100%);
+  color: #fff;
+}
+
+.tactile-btn.sign-in-btn.drive-syncing .btn-inner.signed-in {
+  animation: pulse-sync 0.8s ease-in-out infinite;
+  background: linear-gradient(135deg, #3b82f6 0%, #60a5fa 100%);
+  color: #fff;
+}
+
+.tactile-btn.sign-in-btn.drive-synced .btn-inner.signed-in {
+  background: linear-gradient(135deg, #22c55e 0%, #4ade80 100%);
+  color: #fff;
+}
+
+.tactile-btn.sign-in-btn.drive-error .btn-inner.signed-in {
   background: linear-gradient(135deg, #ef4444 0%, #f87171 100%);
   color: #fff;
 }

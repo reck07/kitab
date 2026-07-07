@@ -29,7 +29,16 @@ const Navbar = ({ user, onSignOut, isGuest, onLogin, onGoogleDriveSave, onToggle
     <header className="app-header">
       <div className="header-casing">
         <div className="brand-area">
-          <h1 className="brand-label">kitāb</h1>
+          <div className="brand-top">
+            <svg className="brand-mark" viewBox="0 0 24 24" width="22" height="22" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <path d="M5 3v18" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/>
+              <path d="M6 12l12-8" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/>
+              <path d="M6 12l12 8" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round"/>
+              <circle cx="19" cy="5" r="1.8" fill="#6366f1"/>
+            </svg>
+            <h1 className="brand-label">kitāb</h1>
+          </div>
+          <div className="brand-divider" />
           <span className="brand-sub">the Reckoner</span>
         </div>
         <div className="controls-area">
@@ -37,7 +46,7 @@ const Navbar = ({ user, onSignOut, isGuest, onLogin, onGoogleDriveSave, onToggle
             <div className="button-unit" key={btn.label}>
               <button
                 type="button"
-                className={`tactile-btn${btn.isSignIn ? ' sign-in-btn' : ''}${btn.isDrive ? ' drive-btn' : ''}${btn.isDrive && driveSyncStatus === 'syncing' ? ' syncing' : ''}${btn.isDrive && driveSyncStatus === 'synced' ? ' synced' : ''}${btn.isDrive && driveSyncStatus === 'error' ? ' sync-error' : ''}`}
+                className={`tactile-btn${btn.isSignIn ? ' sign-in-btn' : ''}${btn.isDrive ? ' drive-btn' : ''}${btn.isDrive && driveSyncStatus === 'syncing' ? ' syncing' : ''}${btn.isDrive && driveSyncStatus === 'synced' ? ' synced' : ''}${btn.isDrive && driveSyncStatus === 'error' ? ' sync-error' : ''}${btn.isSignIn && isSignedIn && driveSyncStatus !== 'idle' && driveSyncStatus ? ` drive-${driveSyncStatus}` : ''}`}
                 title={btn.title}
                 onClick={() => handleClick(btn)}
               >
