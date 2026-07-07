@@ -290,10 +290,10 @@ body {
 }
 
 .note-preview {
-  font-size: 13px;
+  font-size: 0.8rem;
   color: var(--text-muted);
   display: -webkit-box;
-  -webkit-line-clamp: 2;
+  -webkit-line-clamp: 1;
   -webkit-box-orient: vertical;
   overflow: hidden;
   margin: 4px 0;

@@ -127,7 +127,7 @@ const NoteEditor = ({
     };
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
-  });
+  }, [handleSave]);
 
   const handleUndo = () => {
     document.execCommand('undo');

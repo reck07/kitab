@@ -82,8 +82,9 @@ export function useNotes(user) {
       localStorage.setItem('notes', JSON.stringify(currentNotes));
       if (userRef.current && supabase) {
         supabase.from('notes').upsert({ ...latestNote, user_id: userRef.current.id }).then(() => triggerSavedIndicator()).catch(() => triggerSavedIndicator());
+      } else {
+        triggerSavedIndicator();
       }
-      triggerSavedIndicator();
     }, 800);
   }, [triggerSavedIndicator]);
 
@@ -305,7 +306,7 @@ export function useNotes(user) {
     setNotes(updatedNotes);
     localStorage.setItem('notes', JSON.stringify(updatedNotes));
     if (user && supabase) supabase.from('notes').upsert({ ...updatedNotes.find(n => n.id === noteId), user_id: user.id }).then(() => triggerSavedIndicator()).catch(() => triggerSavedIndicator());
-    triggerSavedIndicator();
+    else triggerSavedIndicator();
   };
 
   const reorderNotes = (fromIndex, toIndex) => {

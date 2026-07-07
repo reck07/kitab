@@ -11,17 +11,23 @@
   --text-main: #0f172a;
   --text-muted: #64748b;
   --border: #e2e8f0;
-  --accent: #4f46e5; /* Deep Indigo for a premium feel */
+  --accent: #4f46e5;
   --accent-hover: #4338ca;
+  --accent-rgb: 79, 70, 229;
   --danger: #ef4444;
-  --radius: 8px; /* Tighter radius is standard for professional SaaS */
+  --radius: 8px;
   --shadow: 0 4px 6px -1px rgba(0,0,0,0.05), 0 2px 4px -2px rgba(0,0,0,0.025);
   --shadow-sm: 0 1px 2px 0 rgba(0,0,0,0.05);
   --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  --bg-navbar: #e8e4de;
+  --bg-navbar-btn: #c8c3bc;
+  --bg-navbar-inner: #b8b3ac;
+  --text-navbar: #3a3530;
+  --border-navbar: #b8b3ac;
 }
 
 [data-theme='dark'] {
-  --bg-main: #09090b; /* Sleeker, deeper dark mode (Zinc) */
+  --bg-main: #09090b;
   --bg-glass: rgba(9, 9, 11, 0.85);
   --bg-sidebar: #18181b;
   --bg-card: #18181b;
@@ -32,9 +38,15 @@
   --border: #27272a;
   --accent: #6366f1;
   --accent-hover: #818cf8;
+  --accent-rgb: 99, 102, 241;
   --danger: #f87171;
   --shadow: 0 4px 6px -1px rgba(0,0,0,0.4);
   --shadow-sm: 0 1px 2px 0 rgba(0,0,0,0.2);
+  --bg-navbar: #1a1a1e;
+  --bg-navbar-btn: #27272a;
+  --bg-navbar-inner: #3f3f46;
+  --text-navbar: #d4d4d8;
+  --border-navbar: #3f3f46;
 }
 
 [data-theme='coffee'] {
@@ -49,8 +61,14 @@
   --border: #d4c4b7;
   --accent: #8c5a35;
   --accent-hover: #6b4226;
+  --accent-rgb: 140, 90, 53;
   --danger: #ef4444;
   --shadow: 0 4px 12px -2px rgba(74, 52, 36, 0.15);
+  --bg-navbar: #d4c4b7;
+  --bg-navbar-btn: #b8a595;
+  --bg-navbar-inner: #a08b7a;
+  --text-navbar: #3a281c;
+  --border-navbar: #a08b7a;
 }
 
 * {
@@ -347,7 +365,7 @@ body {
 /* Floating Action Bar Wrapper */
 .editor-search-bar {
   position: fixed;
-  right: 56px;
+  right: 200px;
   top: 50%;
   transform: translateY(-50%);
   z-index: 91;
@@ -431,9 +449,10 @@ body {
   font-size: 11px;
   padding: 3px;
   text-align: center;
-  border: none;
-  background: #000;
-  color: #fff;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg-card);
+  color: var(--text-main);
 }
 
 .text-tools .toolbar-meta {
@@ -1598,8 +1617,8 @@ body {
 /* ===== BRAUN-INSPIRED SKEUOMORPHIC NAVBAR ===== */
 .app-header {
   padding: 12px 24px;
-  background: linear-gradient(180deg, #f2f2f2 0%, #e8e8e8 100%);
-  border-bottom: 2px solid #c8c8c8;
+  background: var(--bg-navbar);
+  border-bottom: 2px solid var(--border-navbar);
   box-shadow: 0 4px 12px rgba(0,0,0,0.15);
   position: sticky;
   top: 0;
@@ -1635,7 +1654,7 @@ body {
   font-family: 'Georgia', 'Palatino', 'Times New Roman', serif;
   font-size: 18px;
   font-weight: 600;
-  color: #2a2a2a;
+  color: var(--text-navbar);
   margin: 0;
   letter-spacing: 0.04em;
   text-transform: lowercase;
@@ -1644,7 +1663,7 @@ body {
 .brand-divider {
   width: 100%;
   height: 1px;
-  background: linear-gradient(90deg, #bbb 0%, #ddd 50%, transparent 100%);
+  background: linear-gradient(90deg, var(--border-navbar) 0%, var(--text-muted) 50%, transparent 100%);
   margin: 1px 0;
 }
 
@@ -1653,7 +1672,7 @@ body {
   font-size: 9.5px;
   font-weight: 300;
   font-style: italic;
-  color: #999;
+  color: var(--text-muted);
   margin: 0;
   letter-spacing: 0.1em;
   line-height: 1;
@@ -1665,7 +1684,7 @@ body {
   align-items: flex-end;
   gap: 20px;
   padding-left: 18px;
-  border-left: 1px solid rgba(0,0,0,0.08);
+  border-left: 1px solid var(--border-navbar);
 }
 
 .button-unit {
@@ -1691,13 +1710,13 @@ body {
   width: 44px;
   height: 44px;
   border-radius: 50%;
-  background: #d4d4d4;
+  background: var(--bg-navbar-btn);
   display: flex;
   align-items: center;
   justify-content: center;
   box-shadow:
     0 3px 6px rgba(0,0,0,0.25),
-    inset 0 1px 0 rgba(255,255,255,0.9);
+    inset 0 1px 0 rgba(255,255,255,0.3);
   transition: box-shadow 0.1s, transform 0.1s;
 }
 
@@ -1711,23 +1730,23 @@ body {
   width: 34px;
   height: 34px;
   border-radius: 50%;
-  background: linear-gradient(180deg, #c0c0c0 0%, #d8d8d8 100%);
+  background: var(--bg-navbar-inner);
   display: flex;
   align-items: center;
   justify-content: center;
-  color: #555;
+  color: var(--text-navbar);
   box-shadow:
     inset 0 2px 4px rgba(0,0,0,0.2),
-    inset 0 -1px 0 rgba(255,255,255,0.7);
+    inset 0 -1px 0 rgba(255,255,255,0.3);
 }
 
 .tactile-btn.sign-in-btn .btn-outer {
-  background: #d4d4d4;
+  background: var(--bg-navbar-btn);
 }
 
 .tactile-btn.sign-in-btn .btn-inner {
-  background: linear-gradient(180deg, #b8b8b8 0%, #d0d0d0 100%);
-  color: #333;
+  background: var(--bg-navbar-inner);
+  color: var(--text-navbar);
 }
 
 .tactile-btn.sign-in-btn .btn-inner.signed-in {
@@ -1786,7 +1805,7 @@ body {
   font-family: 'Helvetica Neue', 'Inter', system-ui, sans-serif;
   font-size: 11px;
   font-weight: 500;
-  color: #444;
+  color: var(--text-navbar);
   text-transform: lowercase;
   letter-spacing: 0.02em;
 }
@@ -1807,15 +1826,15 @@ body {
   align-items: center;
   gap: 20px;
   padding: 20px 0 12px;
-  background: #f7f5f0;
-  border-right: 1px solid #e0ddd6;
+  background: var(--bg-sidebar);
+  border-right: 1px solid var(--border);
 }
 
 .action-meta {
   font-family: 'Helvetica Neue', 'Inter', system-ui, sans-serif;
   font-size: 10px;
   line-height: 1.5;
-  color: #999;
+  color: var(--text-muted);
   text-align: center;
   text-transform: lowercase;
   letter-spacing: 0.02em;
@@ -1833,7 +1852,7 @@ body {
   border: none;
   cursor: pointer;
   padding: 0;
-  color: #666;
+  color: var(--text-muted);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1844,12 +1863,12 @@ body {
 }
 
 .action-icon-btn:hover {
-  color: #333;
-  background: rgba(0,0,0,0.05);
+  color: var(--text-main);
+  background: var(--bg-active);
 }
 
 .action-lock-icon {
-  color: #999;
+  color: var(--text-muted);
   margin-top: 4px;
 }
 
@@ -1870,8 +1889,8 @@ body {
   font-size: 9px;
   padding: 2px 6px;
   border-radius: 8px;
-  background: #e8e5dd;
-  color: #555;
+  background: var(--bg-card-hover);
+  color: var(--text-muted);
   display: flex;
   align-items: center;
   gap: 3px;
@@ -1895,10 +1914,10 @@ body {
   width: 100%;
   font-size: 10px;
   padding: 3px 6px;
-  border: 1px solid #ddd;
+  border: 1px solid var(--border);
   border-radius: 8px;
-  background: #fff;
-  color: #555;
+  background: var(--bg-card);
+  color: var(--text-main);
   outline: none;
   font-family: inherit;
   box-sizing: border-box;
@@ -2123,8 +2142,8 @@ body {
 
 .note-list[data-view="grid"] .note-card .note-card-icons {
   position: absolute;
-  top: 52px;
-  right: 4px;
+  bottom: 6px;
+  right: 6px;
   display: flex;
   gap: 1px;
   opacity: 0;
@@ -2136,7 +2155,7 @@ body {
 }
 
 .note-list[data-view="grid"] .note-card .note-card-icons .note-icon-btn {
-  background: rgba(255,255,255,0.9);
+  background: var(--bg-glass);
   border-radius: 50%;
   width: 22px;
   height: 22px;
@@ -2144,6 +2163,7 @@ body {
   align-items: center;
   justify-content: center;
   backdrop-filter: blur(4px);
+  color: var(--text-muted);
 }
 
 .note-list[data-view="grid"] .note-card h3 {

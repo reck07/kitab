@@ -167,6 +167,10 @@ function App() {
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
   const [isSidebarOpen, setIsSidebarOpen] = useState(true);
   const [isEditorOpen, setIsEditorOpen] = useState(window.innerWidth >= 768);
+  const notesRef = useRef(notes);
+  const activeNoteIdRef = useRef(activeNoteId);
+  notesRef.current = notes;
+  activeNoteIdRef.current = activeNoteId;
   const debounceRef = useRef(null);
   const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'coffee');
   const [showGraph, setShowGraph] = useState(false);
@@ -397,7 +401,7 @@ function App() {
   };
 
   const handleGoogleDriveSave = async (noteId) => {
-    const note = notes.find(n => n.id === (noteId || activeNoteId));
+    const note = notesRef.current.find(n => n.id === (noteId || activeNoteIdRef.current));
     if (!note) return;
     setDriveSyncStatus('syncing');
     try {
@@ -415,8 +419,9 @@ function App() {
 
   // Auto-sync to Drive after local save (if Drive is authorized)
   const autoSaveTimerRef = useRef(null);
+  const driveSyncTimerRef = useRef(null);
   const handleEditorUpdateWithDrive = (id, fields) => {
-    setSaveState('saving');
+    setSaveState(prev => prev === 'idle' ? 'saving' : prev);
     handleEditorUpdate(id, fields);
     clearTimeout(autoSaveTimerRef.current);
     autoSaveTimerRef.current = setTimeout(() => {
@@ -424,8 +429,8 @@ function App() {
       setTimeout(() => setSaveState(prev => prev === 'saved-local' ? 'idle' : prev), 2500);
     }, 1000);
     if (driveFolderRef.current || localStorage.getItem('google_client_id')) {
-      clearTimeout(window._driveSyncTimer);
-      window._driveSyncTimer = setTimeout(() => handleGoogleDriveSave(id), 2000);
+      clearTimeout(driveSyncTimerRef.current);
+      driveSyncTimerRef.current = setTimeout(() => handleGoogleDriveSave(id), 2000);
     }
   };
 
