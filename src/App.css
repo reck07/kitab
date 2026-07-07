@@ -2281,11 +2281,10 @@ body {
 /* ===== HONEYCOMB VIEW ===== */
 .note-list[data-view="honeycomb"] {
   display: grid;
-  grid-template-columns: repeat(auto-fill, minmax(100px, 1fr));
-  gap: 4px 2px;
-  padding: 20px 16px;
-  align-items: start;
-  justify-items: center;
+  grid-template-columns: repeat(auto-fill, 70px);
+  gap: 4px;
+  padding: 24px 20px;
+  justify-content: center;
 }
 
 .note-list[data-view="honeycomb"] .note-card-wrap {
@@ -2294,9 +2293,9 @@ body {
 
 .note-list[data-view="honeycomb"] .note-card {
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   align-items: center;
-  text-align: center;
+  gap: 6px;
   margin-bottom: 0 !important;
   border: none !important;
   background: none !important;
@@ -2306,30 +2305,33 @@ body {
 }
 
 .note-list[data-view="honeycomb"] .note-card:hover {
-  transform: scale(1.05);
   z-index: 2;
   position: relative;
 }
 
+.note-list[data-view="honeycomb"] .note-card-wrap:nth-child(odd) {
+  margin-top: 18px;
+}
+
 .note-list[data-view="honeycomb"] .hexagon-icon {
-  width: 76px;
-  height: 86px;
+  width: 48px;
+  height: 54px;
   clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
   display: flex;
   align-items: center;
   justify-content: center;
   flex-shrink: 0;
   transition: transform 0.25s ease;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+  box-shadow: 0 3px 8px rgba(0,0,0,0.18);
 }
 
 .note-list[data-view="honeycomb"] .note-card:hover .hexagon-icon {
-  transform: scale(1.08);
-  box-shadow: 0 6px 20px rgba(0,0,0,0.25);
+  transform: scale(1.1);
+  box-shadow: 0 5px 16px rgba(0,0,0,0.3);
 }
 
 .note-list[data-view="honeycomb"] .hexagon-letter {
-  font-size: 28px;
+  font-size: 20px;
   font-weight: 700;
   color: #fff;
   text-shadow: 0 1px 3px rgba(0,0,0,0.3);
@@ -2338,11 +2340,11 @@ body {
 }
 
 .note-list[data-view="honeycomb"] .note-card h3 {
-  font-size: 10px;
+  font-size: 11px;
   font-weight: 500;
   color: var(--text-muted);
-  margin: 6px 0 0;
-  padding: 0 2px;
+  margin: 0;
+  padding: 0;
   max-width: 90px;
   white-space: nowrap;
   overflow: hidden;
@@ -2357,8 +2359,7 @@ body {
 .note-list[data-view="honeycomb"] .note-card .note-preview,
 .note-list[data-view="honeycomb"] .note-card .note-card-icons,
 .note-list[data-view="honeycomb"] .note-card .card-tags,
-.note-list[data-view="honeycomb"] .note-card > div[style*="backgroundImage"],
-.note-list[data-view="honeycomb"] .note-card .note-card-icons {
+.note-list[data-view="honeycomb"] .note-card > div[style*="backgroundImage"] {
   display: none !important;
 }
 
