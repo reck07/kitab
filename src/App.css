@@ -2270,15 +2270,7 @@ body {
 }
 
 .note-list[data-view="card"] .note-card .card-tags {
-  display: flex;
-  gap: 3px;
-  flex-wrap: wrap;
-  padding: 0 0 8px 10px;
-}
-
-.note-list[data-view="card"] .note-card .card-tags .tag-badge-small {
-  font-size: 9px;
-  padding: 1px 5px;
+  display: none;
 }
 
 
