@@ -318,6 +318,37 @@ body {
 }
 
 /* Floating Action Bar Wrapper */
+.editor-search-bar {
+  position: fixed;
+  right: 56px;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 91;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 4px 6px;
+  box-shadow: 0 4px 16px rgba(0,0,0,0.12);
+}
+
+.editor-search-input {
+  width: 160px;
+  padding: 4px 8px;
+  font-size: 13px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--bg-main);
+  color: inherit;
+  outline: none;
+}
+
+.editor-search-input:focus {
+  border-color: var(--accent);
+}
+
 .text-tools-wrapper {
   position: fixed;
   right: 0;
@@ -1519,6 +1550,10 @@ body {
 
 .brand-area {
   flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  line-height: 1;
 }
 
 .brand-label {
@@ -1529,6 +1564,15 @@ body {
   margin: 0;
   letter-spacing: 0.04em;
   text-transform: lowercase;
+}
+
+.brand-sub {
+  font-family: 'Brush Script MT', 'Segoe Script', 'Dancing Script', cursive;
+  font-size: 10px;
+  color: #888;
+  margin: 0;
+  letter-spacing: 0.03em;
+  line-height: 1;
 }
 
 .controls-area {

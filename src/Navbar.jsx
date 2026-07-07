@@ -28,6 +28,7 @@ const Navbar = ({ user, onSignOut, isGuest, onLogin, onGoogleDriveSave, onToggle
       <div className="header-casing">
         <div className="brand-area">
           <h1 className="brand-label">kitāb</h1>
+          <span className="brand-sub">Reckoner</span>
         </div>
         <div className="controls-area">
           {buttons.map((btn) => (

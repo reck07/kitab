@@ -1,5 +1,5 @@
 import { useRef, useEffect, useState } from 'react';
-import { List, Heading1, Heading2, MessageSquare, Mic, Share2, Lock, Pin, Star, Archive, X, ArrowLeft, Image as ImageIcon, Smile, Bot, SpellCheck, FileText, ChevronRight, CheckSquare, Layout, Trash2, RotateCcw, FilePlus, Save, QrCode, Calendar, Plus, Circle } from 'lucide-react';
+import { List, Heading1, Heading2, MessageSquare, Mic, Share2, Lock, Pin, Star, Archive, X, ArrowLeft, Image as ImageIcon, Smile, Bot, SpellCheck, FileText, ChevronRight, CheckSquare, Layout, Trash2, RotateCcw, FilePlus, Save, QrCode, Calendar, Plus, Circle, Undo2, Redo2, Search } from 'lucide-react';
 import Tesseract from 'tesseract.js';
 import { PAPER_TYPES, CANVAS_SIZES, getPaperType } from './paperTypes';
 import { suggestTags } from './autoTag';
@@ -56,6 +56,10 @@ const NoteEditor = ({
   const [isRefreshing, setIsRefreshing] = useState(false);
   const [refreshParticles, setRefreshParticles] = useState([]);
   const [refreshMessage, setRefreshMessage] = useState('');
+  const [showSearch, setShowSearch] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [searchMatchIdx, setSearchMatchIdx] = useState(0);
+  const searchInputRef = useRef(null);
 
   // Update editor content only when the active note changes
   useEffect(() => {
@@ -99,6 +103,81 @@ const NoteEditor = ({
     setTimeout(() => {
       setJustSaved(false);
     }, 2000);
+  };
+
+  const handleUndo = () => {
+    document.execCommand('undo');
+    editorRef.current?.focus();
+  };
+
+  const handleRedo = () => {
+    document.execCommand('redo');
+    editorRef.current?.focus();
+  };
+
+  const handleSearch = (query) => {
+    setSearchQuery(query);
+    if (!query || !editorRef.current) {
+      clearEditorHighlight();
+      return;
+    }
+    const html = editorRef.current.innerHTML;
+    const matches = html.match(new RegExp(query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'));
+    const matchCount = matches ? matches.length : 0;
+    setSearchMatchIdx(0);
+    if (matchCount === 0) return;
+    highlightInEditor(query, 0);
+  };
+
+  const clearEditorHighlight = () => {
+    if (!editorRef.current) return;
+    const text = editorRef.current.innerText;
+    editorRef.current.innerHTML = text;
+  };
+
+  const highlightInEditor = (query, idx) => {
+    if (!editorRef.current || !query) return;
+    const text = editorRef.current.innerText;
+    const escaped = query.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const regex = new RegExp(`(${escaped})`, 'gi');
+    let match;
+    let count = 0;
+    const parts = [];
+    let lastIdx = 0;
+    while ((match = regex.exec(text)) !== null) {
+      if (count === idx) {
+        parts.push(text.slice(lastIdx, match.index));
+        parts.push(`<mark style="background:#ffeb3b;color:#000;border-radius:2px;padding:0 2px">${match[0]}</mark>`);
+        lastIdx = match.index + match[0].length;
+        parts.push(text.slice(lastIdx));
+        editorRef.current.innerHTML = parts.join('');
+        return;
+      }
+      count++;
+      lastIdx = match.index + match[0].length;
+    }
+  };
+
+  const handleSearchNext = () => {
+    if (!searchQuery || !editorRef.current) return;
+    const html = editorRef.current.innerText;
+    const matches = html.match(new RegExp(searchQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'));
+    const matchCount = matches ? matches.length : 0;
+    if (matchCount === 0) return;
+    const nextIdx = (searchMatchIdx + 1) % matchCount;
+    setSearchMatchIdx(nextIdx);
+    highlightInEditor(searchQuery, nextIdx);
+  };
+
+  const handleSearchPrev = () => {
+    if (!searchQuery || !editorRef.current) return;
+    const html = editorRef.current.innerText;
+    const matches = html.match(new RegExp(searchQuery.replace(/[.*+?^${}()|[\]\\]/g, '\\$&'), 'gi'));
+    const matchCount = matches ? matches.length : 0;
+    if (matchCount === 0) return;
+    const prevIdx = (searchMatchIdx - 1 + matchCount) % matchCount;
+    setSearchMatchIdx(prevIdx);
+    highlightInEditor(searchQuery, prevIdx);
   };
 
   const handleTagInput = (e) => {
@@ -476,6 +555,14 @@ const NoteEditor = ({
         <button className="btn-icon mobile-back-button" onClick={onCloseEditor}><ArrowLeft size={20} /></button>
       )}
       
+      {showSearch && (
+        <div className="editor-search-bar">
+          <input ref={searchInputRef} type="text" value={searchQuery} onChange={e => handleSearch(e.target.value)} onKeyDown={e => { if (e.key === 'Enter') handleSearchNext(); }} placeholder="Search in note..." className="editor-search-input" />
+          <button className="btn-icon sm" onClick={handleSearchPrev} title="Previous"><span style={{ fontSize: 12 }}>▲</span></button>
+          <button className="btn-icon sm" onClick={handleSearchNext} title="Next"><span style={{ fontSize: 12 }}>▼</span></button>
+          <button className="btn-icon sm" onClick={() => { clearEditorHighlight(); setShowSearch(false); setSearchQuery(''); }} title="Close"><X size={14} /></button>
+        </div>
+      )}
       <div className={`text-tools-wrapper ${isToolsOpen ? '' : 'collapsed'}`}>
         <button 
           className="text-tools-toggle" 
@@ -506,6 +593,10 @@ const NoteEditor = ({
           <button className="btn-icon sm" onClick={() => { editorRef.current?.focus(); document.execCommand('formatBlock', false, 'h2'); editorRef.current?.focus(); }} title="Heading 2"><Heading2 size={15} /></button>
           <button className="btn-icon sm" onClick={() => { editorRef.current?.focus(); document.execCommand('formatBlock', false, 'blockquote'); }} title="Quote"><MessageSquare size={15} /></button>
           <button className="btn-icon sm" onClick={() => { editorRef.current?.focus(); document.execCommand('insertHorizontalRule'); }} title="Divider">—</button>
+          <div className="toolbar-divider"></div>
+          <button className="btn-icon sm" onClick={handleUndo} title="Undo"><Undo2 size={15} /></button>
+          <button className="btn-icon sm" onClick={handleRedo} title="Redo"><Redo2 size={15} /></button>
+          <button className="btn-icon sm" onClick={() => { setShowSearch(!showSearch); if (!showSearch) setTimeout(() => searchInputRef.current?.focus(), 100); }} title="Search" style={{ color: showSearch ? 'var(--accent)' : 'var(--text-muted)' }}><Search size={15} /></button>
           <div className="toolbar-divider"></div>
           <button className="btn-icon sm" onClick={handleVoiceInput} title="Voice Input" style={{ color: isRecording ? 'var(--danger)' : 'var(--text-muted)' }}><Mic size={15} /></button>
           <button className="btn-icon sm" onClick={handleShare} title="Share"><Share2 size={15} /></button>
