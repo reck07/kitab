@@ -29,6 +29,13 @@ const getTagColor = (tag) => {
   return `hsl(${h}, 70%, 45%)`;
 };
 
+const getTitleColor = (title) => {
+  let hash = 0;
+  for (let i = 0; i < (title || '').length; i++) hash = title.charCodeAt(i) + ((hash << 5) - hash);
+  const h = Math.abs(hash) % 360;
+  return `hsl(${h}, 65%, 50%)`;
+};
+
 const NoteCard = ({ note, isActive, onClick, searchQuery, onTogglePin, onToggleFavorite, onToggleArchive, onDelete, onRestore, onPermanentDelete }) => {
   const isLocked = typeof note.content === 'string' && note.content.startsWith('locked:v1:');
   const previewText = isLocked
@@ -68,6 +75,9 @@ const NoteCard = ({ note, isActive, onClick, searchQuery, onTogglePin, onToggleF
         onTouchEnd={handleTouchEnd}
         style={{ opacity: isTrash ? 0.6 : 1, transition: 'transform 0.2s', transform: swiped ? 'translateX(-60px)' : 'translateX(0)' }}
       >
+        <div className="hexagon-icon" style={{ background: getTitleColor(note.title) }}>
+          <span className="hexagon-letter">{(note.title || 'U').charAt(0).toUpperCase()}</span>
+        </div>
         {note.coverImage && (
           <div style={{
             height: '40px',
