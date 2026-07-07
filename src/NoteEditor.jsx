@@ -61,6 +61,7 @@ const NoteEditor = ({
   const [showSearch, setShowSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchMatchIdx, setSearchMatchIdx] = useState(0);
+  const [isEditorFocused, setIsEditorFocused] = useState(false);
   const searchInputRef = useRef(null);
 
   // Update editor content only when the active note changes
@@ -106,6 +107,22 @@ const NoteEditor = ({
       setJustSaved(false);
     }, 2000);
   };
+
+  useEffect(() => {
+    const onKey = (e) => {
+      if (!editorRef.current) return;
+      const ctrl = e.ctrlKey || e.metaKey;
+      if (!ctrl) return;
+      switch (e.key.toLowerCase()) {
+        case 's': e.preventDefault(); handleSave(); break;
+        case 'b': e.preventDefault(); document.execCommand('bold'); break;
+        case 'i': e.preventDefault(); document.execCommand('italic'); break;
+        case 'z': e.preventDefault(); document.execCommand(e.shiftKey ? 'redo' : 'undo'); break;
+      }
+    };
+    document.addEventListener('keydown', onKey);
+    return () => document.removeEventListener('keydown', onKey);
+  });
 
   const handleUndo = () => {
     document.execCommand('undo');
@@ -565,7 +582,7 @@ const NoteEditor = ({
           <button className="btn-icon sm" onClick={() => { clearEditorHighlight(); setShowSearch(false); setSearchQuery(''); }} title="Close"><X size={14} /></button>
         </div>
       )}
-      <div className={`text-tools-wrapper ${isToolsOpen ? '' : 'collapsed'}`}>
+      <div className={`text-tools-wrapper ${isToolsOpen ? '' : 'collapsed'}${isEditorFocused ? ' dimmed' : ''}`}>
         <button 
           className="text-tools-toggle" 
           onClick={() => setIsToolsOpen(!isToolsOpen)}
@@ -599,6 +616,7 @@ const NoteEditor = ({
           <button className="btn-icon sm" onClick={handleUndo} title="Undo"><Undo2 size={15} /></button>
           <button className="btn-icon sm" onClick={handleRedo} title="Redo"><Redo2 size={15} /></button>
           <button className="btn-icon sm" onClick={() => { setShowSearch(!showSearch); if (!showSearch) setTimeout(() => searchInputRef.current?.focus(), 100); }} title="Search" style={{ color: showSearch ? 'var(--accent)' : 'var(--text-muted)' }}><Search size={15} /></button>
+          <button className="btn-icon sm" onClick={onThemeChange} title="Toggle Theme" style={{ color: 'var(--text-muted)' }}><Sun size={15} /></button>
           <div className="toolbar-divider"></div>
           <button className="btn-icon sm" onClick={handleVoiceInput} title="Voice Input" style={{ color: isRecording ? 'var(--danger)' : 'var(--text-muted)' }}><Mic size={15} /></button>
           <button className="btn-icon sm" onClick={handleShare} title="Share"><Share2 size={15} /></button>
@@ -618,7 +636,6 @@ const NoteEditor = ({
           <button className="btn-icon sm" onClick={() => setShowLayoutSettings(!showLayoutSettings)} title="Size"><Layout size={15} /></button>
           <button className="btn-icon sm" onClick={() => window.open('https://gemini.google.com', '_blank')} title="AI"><Bot size={15} /></button>
           <button className="btn-icon sm" onClick={onToggleFocus} title="Focus Mode" style={{ opacity: focusMode ? 1 : 0.5 }}><Layout size={15} /></button>
-          <button className="btn-icon sm" onClick={onThemeChange} title="Toggle Theme"><Sun size={15} /></button>
           <div className="toolbar-divider"></div>
           <button className="btn-icon sm" onClick={onSaveTemplate} title="Save as Template"><FileText size={15} /></button>
           <button className="btn-icon sm" onClick={onLoadTemplate} title="New from Template"><FilePlus size={15} /></button>
@@ -831,7 +848,8 @@ const NoteEditor = ({
                 ref={editorRef}
                 contentEditable
                 suppressContentEditableWarning
-                onBlur={handleBlur}
+                onBlur={() => { handleBlur(); setIsEditorFocused(false); }}
+                onFocus={() => setIsEditorFocused(true)}
                 onInput={() => onUpdate(activeNote.id, { content: editorRef.current.innerHTML })}
                 onClick={handleEditorClick}
                 className="editor-content"

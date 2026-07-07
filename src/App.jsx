@@ -501,7 +501,7 @@ function App() {
               </div>
               <div className={`note-list view-${viewMode}`}>
                 {filteredNotes.length === 0 && (
-                  <div className="empty-state"><p>{searchQuery ? 'No matching notes found.' : showTrash ? 'Trash is empty.' : 'No notes yet. Create one!'}</p></div>
+                  <div className="empty-state" style={{ textAlign: 'center', padding: '40px 16px' }}><p style={{ color: 'var(--text-muted)' }}>{searchQuery ? 'No matching notes found.' : showTrash ? 'Trash is empty.' : 'No notes yet. Tap the + button above to create one.'}</p></div>
                 )}
                 {filteredNotes.map((note, idx) => (
                   <div key={note.id} draggable={sortOrder === 'manual'} onDragStart={(e) => handleDragStart(e, idx)} onDragOver={(e) => handleDragOver(e, idx)} onDragEnd={handleDragEnd} style={{ opacity: dragIndex === idx ? 0.5 : 1, cursor: sortOrder === 'manual' ? 'grab' : 'default' }}>
@@ -540,9 +540,9 @@ function App() {
                   theme={theme}
                 />
               ) : (
-                <div className="empty-state" style={{ background: 'var(--bg-card)', margin: '24px', borderRadius: 'var(--radius)', boxShadow: 'var(--shadow)' }}>
-                  <h2>{getGreeting()}</h2>
-                  <p>Select a note from the sidebar or create a new one to start writing.</p>
+                <div className="empty-state" style={{ background: 'var(--bg-card)', margin: '24px', borderRadius: 'var(--radius)', boxShadow: 'var(--shadow)', textAlign: 'center' }}>
+                  <h2>{getGreeting()} ✨</h2>
+                  <p style={{ color: 'var(--text-muted)', fontSize: '14px', maxWidth: '320px', margin: '0 auto' }}>Select a note from the sidebar or press <kbd style={{ background: 'var(--bg-active)', padding: '2px 6px', borderRadius: '4px', fontSize: '12px' }}>Ctrl+N</kbd> to start a new one.</p>
                 </div>
               )}
             </main>
