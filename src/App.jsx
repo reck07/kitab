@@ -19,6 +19,7 @@ import { evaluateRules, applyActions } from './automationRules'
 import { DEFAULT_NOTE_CONFIG, THEME_PRESETS } from './paperTypes'
 import { useAuth } from './hooks/useAuth'
 import { useNotes } from './hooks/useNotes'
+import CommandPalette from './CommandPalette'
 
 const getGreeting = () => {
   const hour = new Date().getHours();
@@ -189,6 +190,8 @@ function App() {
   const [driveSyncStatus, setDriveSyncStatus] = useState('idle');
   const driveTokenRef = useRef(null);
   const driveFolderRef = useRef(null);
+  const [showCommandPalette, setShowCommandPalette] = useState(false);
+  const [saveState, setSaveState] = useState('idle'); // idle | saving | saved-local | saved-drive
 
   // Load cached drive folder id
   useEffect(() => {
@@ -244,14 +247,15 @@ function App() {
       const isCmd = e.metaKey || e.ctrlKey;
       if (isCmd && e.key === 'k') {
         e.preventDefault();
-        document.querySelector('.search-input')?.focus();
+        setShowCommandPalette(true);
       }
       if (isCmd && e.key === 'n') {
         e.preventDefault();
         addPage();
       }
       if (e.key === 'Escape') {
-        if (showGraph) { setShowGraph(false); e.preventDefault(); }
+        if (showCommandPalette) { setShowCommandPalette(false); e.preventDefault(); }
+        else if (showGraph) { setShowGraph(false); e.preventDefault(); }
         else if (showCalculator) { setShowCalculator(false); e.preventDefault(); }
         else if (showDrawingPad) { setShowDrawingPad(false); e.preventDefault(); }
         else if (showSettings) { setShowSettings(false); e.preventDefault(); }
@@ -264,7 +268,7 @@ function App() {
     };
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
-  }, [showGraph, showCalculator, showDrawingPad, showSettings, showLayoutPanel, showSecurityPanel, showQrCode, showAutomation, isTemplatePickerOpen, addPage]);
+  }, [showCommandPalette, showGraph, showCalculator, showDrawingPad, showSettings, showLayoutPanel, showSecurityPanel, showQrCode, showAutomation, isTemplatePickerOpen, addPage]);
 
   const { charCount, wordCount } = useMemo(() => {
     const text = activeNoteForEditor?.content?.replace(/<[^>]*>/g, ' ').trim() || '';
@@ -284,6 +288,27 @@ function App() {
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
+  };
+
+  const handlePaletteAction = (action) => {
+    setShowCommandPalette(false);
+    if (!action) return;
+    switch (action) {
+      case 'newNote': addPage(); break;
+      case 'searchNotes': document.querySelector('.search-input')?.focus(); break;
+      case 'toggleFocus': setFocusMode(p => !p); break;
+      case 'toggleTheme': handleThemeChange(theme === 'light' ? 'dark' : 'light'); break;
+      case 'backupDrive': handleGoogleDriveSave(); break;
+      case 'setViewList': setViewMode('list'); break;
+      case 'setViewGrid': setViewMode('grid'); break;
+      case 'toggleGraph': setShowGraph(p => !p); break;
+      case 'sortLatest': setSortOrder('latest'); break;
+      case 'sortOldest': setSortOrder('oldest'); break;
+      case 'sortManual': setSortOrder('manual'); break;
+      case 'exportJSON': exportJSON(); break;
+      case 'openCalculator': setShowCalculator(true); break;
+      case 'openDrawing': setShowDrawingPad(true); break;
+    }
   };
 
   const handleSummarize = async (id, format = 'summary', customPrompt = null) => {
@@ -388,13 +413,31 @@ function App() {
   };
 
   // Auto-sync to Drive after local save (if Drive is authorized)
+  const autoSaveTimerRef = useRef(null);
   const handleEditorUpdateWithDrive = (id, fields) => {
+    setSaveState('saving');
     handleEditorUpdate(id, fields);
+    clearTimeout(autoSaveTimerRef.current);
+    autoSaveTimerRef.current = setTimeout(() => {
+      setSaveState('saved-local');
+      setTimeout(() => setSaveState(prev => prev === 'saved-local' ? 'idle' : prev), 2500);
+    }, 1000);
     if (driveFolderRef.current || localStorage.getItem('google_client_id')) {
       clearTimeout(window._driveSyncTimer);
       window._driveSyncTimer = setTimeout(() => handleGoogleDriveSave(id), 2000);
     }
   };
+
+  // Watch driveSyncStatus to update saveState
+  useEffect(() => {
+    if (driveSyncStatus === 'synced') {
+      setSaveState('saved-drive');
+      setTimeout(() => setSaveState(prev => prev === 'saved-drive' ? 'idle' : prev), 3000);
+    } else if (driveSyncStatus === 'error') {
+      setSaveState('saved-local');
+      setTimeout(() => setSaveState(prev => prev === 'saved-local' ? 'idle' : prev), 3000);
+    }
+  }, [driveSyncStatus]);
 
   const handleNoteSelect = async (id) => {
     const note = notes.find(n => n.id === id);
@@ -431,7 +474,7 @@ function App() {
     }
   }, [activeNoteId, addPage, exportJSON, exportPDF, handleSummarize]);
 
-  const showSidebar = isSidebarOpen;
+  const showSidebar = isSidebarOpen && !focusMode;
   const showEditor = isMobile ? isEditorOpen : true;
 
   // Drag-to-reorder handlers
@@ -587,6 +630,7 @@ function App() {
                   onLoadTemplate={() => setIsTemplatePickerOpen(true)}
                   onThemeChange={() => handleThemeChange(theme === 'light' ? 'dark' : 'light')}
                   theme={theme}
+                  allTags={allTags}
                 />
               ) : (
                 <div className="empty-state" style={{ background: 'var(--bg-card)', margin: '24px', borderRadius: 'var(--radius)', boxShadow: 'var(--shadow)', textAlign: 'center' }}>
@@ -627,17 +671,15 @@ function App() {
             );
           })()}
 
-          <div className={`saved-indicator ${showSavedIndicator ? 'show' : ''}`} style={{ zIndex: 100 }}>
-            Saved at {lastSavedTime} ✓
+          <div className={`saved-indicator ${saveState !== 'idle' ? 'show' : ''}`} style={{ zIndex: 100 }}>
+            {saveState === 'saving' && 'Saving...'}
+            {saveState === 'saved-local' && `Saved at ${lastSavedTime} ✓`}
+            {saveState === 'saved-drive' && 'Saved to Drive ✓'}
           </div>
 
           <FloatingMenu onAction={handleFabAction} />
 
-          <div className="keyboard-shortcuts-hint" style={{ position: 'fixed', bottom: 80, right: 24, fontSize: 11, color: 'var(--text-muted)', opacity: 0.5, pointerEvents: 'none', textAlign: 'right', lineHeight: 1.6 }}>
-            <div><kbd>Ctrl+K</kbd> Search</div>
-            <div><kbd>Ctrl+N</kbd> New note</div>
-            <div><kbd>Esc</kbd> Close modals</div>
-          </div>
+          {showCommandPalette && <CommandPalette onClose={handlePaletteAction} />}
 
           {showGraph && (
             <GraphView notes={notes} unlockedContentById={unlockedContentById} activeNoteId={activeNoteId} onNavigate={handleNoteSelect} onClose={() => setShowGraph(false)} />

@@ -295,10 +295,24 @@ body {
   display: flex;
   flex-direction: column;
   height: 100%;
-  max-width: 840px; /* Optimal reading width */
+  max-width: 840px;
   margin: 0 auto;
   width: 100%;
   padding: 2rem 3rem;
+  animation: fadeSlideUp 0.3s ease-out;
+}
+
+@keyframes fadeSlideUp {
+  from { opacity: 0; transform: translateY(12px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.editor-header-meta {
+  animation: fadeSlideUp 0.3s ease-out 0.05s both;
+}
+
+.editor-container .digital-paper {
+  animation: fadeSlideUp 0.3s ease-out 0.1s both;
 }
 
 .toolbar-divider {
@@ -355,6 +369,7 @@ body {
   top: 50%;
   transform: translateY(-50%) translateX(0);
   z-index: 90;
+  animation: fadeSlideUp 0.3s ease-out 0.15s both;
   display: flex;
   align-items: center;
   transition: transform 0.4s cubic-bezier(0.2, 0.8, 0.2, 1);
@@ -374,6 +389,10 @@ body {
   opacity: 1;
 }
 
+.text-tools-wrapper.hidden {
+  display: none;
+}
+
 /* Floating Action Bar for Text Tools */
 .text-tools {
   position: relative !important;
@@ -387,10 +406,10 @@ body {
   border: 1px solid var(--border);
   box-shadow: 0 10px 25px -5px rgba(0, 0, 0, 0.15), 0 5px 10px -5px rgba(0, 0, 0, 0.05);
   z-index: 90;
-  gap: 3px !important;
-  width: 60px;
+  gap: 4px !important;
+  width: 62px;
   place-items: center;
-  padding: 6px 0;
+  padding: 10px 4px;
 }
 
 .text-tools > select.font-size-select {
@@ -1556,6 +1575,11 @@ body {
 @keyframes spin {
   from { transform: rotate(0deg); }
   to { transform: rotate(360deg); }
+}
+
+@keyframes fadeInScale {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
 }
 
 /* ===== BRAUN-INSPIRED SKEUOMORPHIC NAVBAR ===== */

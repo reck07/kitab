@@ -31,6 +31,7 @@ const NoteEditor = ({
   onLoadTemplate,
   onThemeChange,
   theme,
+  allTags,
 }) => {
   const editorRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -63,6 +64,10 @@ const NoteEditor = ({
   const [searchMatchIdx, setSearchMatchIdx] = useState(0);
   const [isEditorFocused, setIsEditorFocused] = useState(false);
   const searchInputRef = useRef(null);
+  const [tagInputValue, setTagInputValue] = useState('');
+  const [tagSuggestions, setTagSuggestions] = useState([]);
+  const [selectedSuggestionIdx, setSelectedSuggestionIdx] = useState(-1);
+  const tagInputRef = useRef(null);
 
   // Update editor content only when the active note changes
   useEffect(() => {
@@ -582,7 +587,7 @@ const NoteEditor = ({
           <button className="btn-icon sm" onClick={() => { clearEditorHighlight(); setShowSearch(false); setSearchQuery(''); }} title="Close"><X size={14} /></button>
         </div>
       )}
-      <div className={`text-tools-wrapper ${isToolsOpen ? '' : 'collapsed'}${isEditorFocused ? ' dimmed' : ''}`}>
+      <div className={`text-tools-wrapper ${isToolsOpen ? '' : 'collapsed'}${isEditorFocused ? ' dimmed' : ''}${focusMode ? ' hidden' : ''}`}>
         <button 
           className="text-tools-toggle" 
           onClick={() => setIsToolsOpen(!isToolsOpen)}
@@ -616,7 +621,7 @@ const NoteEditor = ({
           <button className="btn-icon sm" onClick={handleUndo} title="Undo"><Undo2 size={15} /></button>
           <button className="btn-icon sm" onClick={handleRedo} title="Redo"><Redo2 size={15} /></button>
           <button className="btn-icon sm" onClick={() => { setShowSearch(!showSearch); if (!showSearch) setTimeout(() => searchInputRef.current?.focus(), 100); }} title="Search" style={{ color: showSearch ? 'var(--accent)' : 'var(--text-muted)' }}><Search size={15} /></button>
-          <button className="btn-icon sm" onClick={onThemeChange} title="Toggle Theme" style={{ color: 'var(--text-muted)' }}><Sun size={15} /></button>
+          <button className="btn-icon sm" onClick={onThemeChange} title="warm light, not bright" style={{ color: 'var(--text-muted)' }}><Sun size={15} /></button>
           <div className="toolbar-divider"></div>
           <button className="btn-icon sm" onClick={handleVoiceInput} title="Voice Input" style={{ color: isRecording ? 'var(--danger)' : 'var(--text-muted)' }}><Mic size={15} /></button>
           <button className="btn-icon sm" onClick={handleShare} title="Share"><Share2 size={15} /></button>
@@ -796,7 +801,18 @@ const NoteEditor = ({
                   <button className="remove-tag-btn" onClick={() => handleRemoveTagClick(tag)}>×</button>
                 </span>
               ))}
-              <input type="text" className="tag-input" placeholder="tag" onKeyDown={handleTagInput} />
+              <div className="tag-input-wrapper" style={{ position: 'relative', display: 'inline-flex' }}>
+                <input ref={tagInputRef} type="text" className="tag-input" placeholder="tag" value={tagInputValue} onChange={e => { const val = e.target.value; setTagInputValue(val); if (val.startsWith('#')) { const q = val.slice(1).toLowerCase(); const matches = (allTags || []).filter(t => t.toLowerCase().includes(q) && !activeNote.tags?.includes(t)).slice(0, 6); setTagSuggestions(matches); setSelectedSuggestionIdx(-1); } else { setTagSuggestions([]); } }} onKeyDown={e => { if (e.key === 'Enter') { if (tagSuggestions.length > 0 && selectedSuggestionIdx >= 0) { const tag = tagSuggestions[selectedSuggestionIdx]; if (tag && !activeNote.tags?.includes(tag)) { onUpdate(activeNote.id, { tags: [...(activeNote.tags || []), tag] }); } setTagInputValue(''); setTagSuggestions([]); return; } handleTagInput(e); setTagInputValue(''); } else if (e.key === 'ArrowDown') { e.preventDefault(); setSelectedSuggestionIdx(i => Math.min(i + 1, tagSuggestions.length - 1)); } else if (e.key === 'ArrowUp') { e.preventDefault(); setSelectedSuggestionIdx(i => Math.max(i - 1, 0)); } else if (e.key === 'Escape') { setTagSuggestions([]); } }} />
+                {tagSuggestions.length > 0 && (
+                  <div style={{ position: 'absolute', top: '100%', left: 0, minWidth: 140, background: 'var(--bg-app)', border: '1px solid var(--border)', borderRadius: 8, boxShadow: '0 8px 24px rgba(0,0,0,0.15)', zIndex: 100, padding: '4px 0', marginTop: 2 }}>
+                    {tagSuggestions.map((tag, idx) => (
+                      <div key={tag} style={{ padding: '5px 12px', fontSize: 12, cursor: 'pointer', background: idx === selectedSuggestionIdx ? 'var(--bg-active)' : 'transparent', display: 'flex', alignItems: 'center', gap: 6 }} onClick={() => { if (!activeNote.tags?.includes(tag)) { onUpdate(activeNote.id, { tags: [...(activeNote.tags || []), tag] }); } setTagInputValue(''); setTagSuggestions([]); }} onMouseEnter={() => setSelectedSuggestionIdx(idx)}>
+                        <span>#</span>{tag}
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
               <button className="btn-icon sm" onClick={() => {
                 const suggestions = suggestTags(activeNote);
                 suggestions.forEach(tag => {
