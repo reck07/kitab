@@ -536,6 +536,8 @@ function App() {
                   focusMode={focusMode}
                   onSaveTemplate={saveAsTemplate}
                   onLoadTemplate={() => setIsTemplatePickerOpen(true)}
+                  onThemeChange={() => handleThemeChange(theme === 'light' ? 'dark' : 'light')}
+                  theme={theme}
                 />
               ) : (
                 <div className="empty-state" style={{ background: 'var(--bg-card)', margin: '24px', borderRadius: 'var(--radius)', boxShadow: 'var(--shadow)' }}>

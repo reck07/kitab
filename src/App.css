@@ -762,9 +762,11 @@ body {
     z-index: 1000;
   }
   .text-tools {
-    margin-right: 8px;
+    max-height: 80vh;
+    overflow-y: auto;
+    overflow-x: hidden;
     padding: 6px !important;
-    width: 110px;
+    width: auto;
   }
   .text-tools .btn-icon.sm {
     width: 30px;
