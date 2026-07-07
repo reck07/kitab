@@ -2,12 +2,12 @@ import { User, Cloud, Plus } from 'lucide-react';
 
 const Navbar = ({ user, onSignOut, isGuest, onLogin, onGoogleDriveSave, onToggleView, onNewNote }) => {
   const isSignedIn = !!user || isGuest;
-  const authLabel = user ? user.email?.split('@')[0] || 'sign out' : isGuest ? 'guest' : 'sign in';
+  const firstLetter = user?.email?.charAt(0)?.toUpperCase();
 
   const buttons = [
     { icon: Plus, label: 'new', title: 'New Note', isNew: true },
     { label: 'view', title: 'View Notes', isView: true },
-    { icon: User, label: authLabel, title: user ? 'Sign Out' : 'Sign In', isSignIn: true },
+    { label: user ? 'sign out' : 'sign in', title: user ? 'Sign Out' : 'Sign In', isSignIn: true },
     { icon: Cloud, label: 'drive', title: 'Upload to Google Drive', isDrive: true },
   ];
 
@@ -39,8 +39,14 @@ const Navbar = ({ user, onSignOut, isGuest, onLogin, onGoogleDriveSave, onToggle
                 onClick={() => handleClick(btn)}
               >
                 <div className="btn-outer">
-                  <div className="btn-inner">
-                    {btn.icon ? <btn.icon size={16} /> : <span style={{ fontSize: 14, fontWeight: 500 }}>i</span>}
+                  <div className={`btn-inner${btn.isSignIn && isSignedIn ? ' signed-in' : ''}`}>
+                    {btn.isSignIn && isSignedIn ? (
+                      <span style={{ fontSize: 14, fontWeight: 600 }}>{firstLetter}</span>
+                    ) : btn.icon ? (
+                      <btn.icon size={16} />
+                    ) : (
+                      <span style={{ fontSize: 14, fontWeight: 500 }}>i</span>
+                    )}
                   </div>
                 </div>
               </button>
