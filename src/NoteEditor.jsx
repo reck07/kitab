@@ -59,12 +59,15 @@ const NoteEditor = ({
 
   // Update editor content only when the active note changes
   useEffect(() => {
-    if (editorRef.current && editorRef.current.innerHTML !== activeNote.content) {
-      const html = (activeNote.content || '').replace(
-        /\[\[(.*?)\]\]/g,
-        (_, title) => `<a href="#" data-wikilink="${title.replace(/"/g, '&quot;')}" style="color:var(--accent);text-decoration:underline;cursor:pointer;font-weight:500;" contenteditable="false">[[${title}]]</a>`
-      );
-      editorRef.current.innerHTML = html;
+    if (editorRef.current) {
+      if (editorRef.current.innerHTML !== activeNote.content) {
+        const html = (activeNote.content || '').replace(
+          /\[\[(.*?)\]\]/g,
+          (_, title) => `<a href="#" data-wikilink="${title.replace(/"/g, '&quot;')}" style="color:var(--accent);text-decoration:underline;cursor:pointer;font-weight:500;" contenteditable="false">[[${title}]]</a>`
+        );
+        editorRef.current.innerHTML = html;
+      }
+      editorRef.current.focus();
     }
     const matches = [...(activeNote.content || '').matchAll(/\[\[(.*?)\]\]/g)];
     setWikilinks(matches.map(m => m[1]));
@@ -735,6 +738,7 @@ const NoteEditor = ({
                 contentEditable
                 suppressContentEditableWarning
                 onBlur={handleBlur}
+                onInput={() => onUpdate(activeNote.id, { content: editorRef.current.innerHTML })}
                 onClick={handleEditorClick}
                 className="editor-content"
                 spellCheck="true"

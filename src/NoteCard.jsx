@@ -40,6 +40,7 @@ const NoteCard = ({ note, isActive, onClick, searchQuery, onTogglePin, onToggleF
     <div
       className={`note-card ${isActive ? 'active' : ''}`}
       onClick={onClick}
+      onDoubleClick={onClick}
       style={{ opacity: isTrash ? 0.6 : 1 }}
     >
       {note.coverImage && (

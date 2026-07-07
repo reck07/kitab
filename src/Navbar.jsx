@@ -1,10 +1,13 @@
 import { User, Cloud, Plus } from 'lucide-react';
 
 const Navbar = ({ user, onSignOut, isGuest, onLogin, onGoogleDriveSave, onToggleView, onNewNote }) => {
+  const isSignedIn = !!user || isGuest;
+  const authLabel = user ? user.email?.split('@')[0] || 'sign out' : isGuest ? 'guest' : 'sign in';
+
   const buttons = [
     { icon: Plus, label: 'new', title: 'New Note', isNew: true },
     { label: 'view', title: 'View Notes', isView: true },
-    { icon: User, label: 'sign in', title: user ? 'Sign Out' : 'Sign In', isSignIn: true },
+    { icon: User, label: authLabel, title: user ? 'Sign Out' : 'Sign In', isSignIn: true },
     { icon: Cloud, label: 'drive', title: 'Upload to Google Drive', isDrive: true },
   ];
 
