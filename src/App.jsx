@@ -591,7 +591,7 @@ function App() {
                   ))}
                 </div>
               </div>
-              <div className={`note-list view-${viewMode}`}>
+              <div className="note-list" data-view={viewMode}>
                 {filteredNotes.length === 0 && (
                   <div className="empty-state" style={{ textAlign: 'center', padding: '40px 16px' }}><p style={{ color: 'var(--text-muted)' }}>{searchQuery ? 'No matching notes found.' : showTrash ? 'Trash is empty.' : 'No notes yet. Tap the + button above to create one.'}</p></div>
                 )}
