@@ -866,7 +866,18 @@ const NoteEditor = ({
                 suppressContentEditableWarning
                 onBlur={() => { handleBlur(); setIsEditorFocused(false); }}
                 onFocus={() => setIsEditorFocused(true)}
-                onInput={() => onUpdate(activeNote.id, { content: editorRef.current.innerHTML })}
+                onInput={() => {
+                  const html = editorRef.current.innerHTML;
+                  const text = editorRef.current.innerText;
+                  const inlineTags = [...text.matchAll(/(?:^|\s)#([a-zA-Z0-9_\-\p{L}]+)/gu)].map(m => m[1].toLowerCase()).filter(t => !/^\d+$/.test(t) && t.length > 0);
+                  const uniqueTags = [...new Set(inlineTags)];
+                  const merged = [...new Set([...(activeNote.tags || []), ...uniqueTags])];
+                  if (merged.length !== (activeNote.tags || []).length) {
+                    onUpdate(activeNote.id, { content: html, tags: merged });
+                  } else {
+                    onUpdate(activeNote.id, { content: html });
+                  }
+                }}
                 onClick={handleEditorClick}
                 className="editor-content"
                 spellCheck="true"
