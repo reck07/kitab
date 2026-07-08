@@ -581,14 +581,14 @@ function App() {
                   <button className="btn-hexagon" onClick={() => setShowAutomation(true)} title="Automation Rules"><Zap size={16} /></button>
                   <button className={`btn-hexagon ${showGraph ? 'active' : ''}`} onClick={() => setShowGraph(!showGraph)} title="Knowledge Graph"><Share2 size={16} /></button>
                 </div>
-                <div className="tag-filter-bar" style={{ marginTop: 0 }}>
+                <div className="tag-filter-bar">
                   {allFolders.filter(Boolean).map(folder => (
                     <span key={folder} className={`tag-pill ${selectedFolder === folder ? 'active' : ''}`} onClick={() => setSelectedFolder(selectedFolder === folder ? null : folder)}>📁 {folder}</span>
                   ))}
                 </div>
-                <div className="tag-filter-bar" style={{ marginTop: 0 }}>
+                <div className="tag-filter-bar">
                   {allTags.map(tag => (
-                    <span key={tag} className={`tag-pill ${selectedTag === tag ? 'active' : ''}`} onClick={() => setSelectedTag(selectedTag === tag ? null : tag)}>#{tag}</span>
+                    <span key={tag} className={`tag-pill ${selectedTag === tag ? 'active' : ''}`} onClick={() => setSelectedTag(selectedTag === tag ? null : tag)}>{tag}</span>
                   ))}
                 </div>
               </div>
