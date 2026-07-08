@@ -417,8 +417,14 @@ body {
 }
 
 .text-tools-wrapper.dimmed .text-tools {
-  opacity: 0.35;
-  transition: opacity 0.6s ease;
+  opacity: 0.2;
+  transition: opacity 0.4s ease;
+  pointer-events: none;
+}
+
+.text-tools-wrapper.dimmed:hover .text-tools {
+  opacity: 0.7;
+  pointer-events: auto;
 }
 
 .text-tools-wrapper.dimmed .text-tools:hover {

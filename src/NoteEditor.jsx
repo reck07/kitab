@@ -587,7 +587,7 @@ const NoteEditor = ({
           <button className="btn-icon sm" onClick={() => { clearEditorHighlight(); setShowSearch(false); setSearchQuery(''); }} title="Close"><X size={14} /></button>
         </div>
       )}
-      <div className={`text-tools-wrapper ${isToolsOpen ? '' : 'collapsed'}${isEditorFocused ? ' dimmed' : ''}${focusMode ? ' hidden' : ''}`}>
+      <div className={`text-tools-wrapper ${isToolsOpen ? '' : 'collapsed'}${!isEditorFocused ? ' dimmed' : ''}${focusMode ? ' hidden' : ''}`}>
         <button 
           className="text-tools-toggle" 
           onClick={() => setIsToolsOpen(!isToolsOpen)}
