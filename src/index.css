@@ -120,6 +120,7 @@ body {
   border-bottom: 1px solid var(--border);
   align-items: center;
   flex-wrap: wrap;
+  overflow: hidden;
 }
 
 /* Search Group */
@@ -358,10 +359,9 @@ body {
 .tag-filter-bar {
   display: flex;
   gap: 6px;
-  margin-top: 12px;
   overflow-x: auto;
   padding-bottom: 4px;
-  scrollbar-width: none; /* Hide scrollbar for Firefox */
+  scrollbar-width: none;
 }
 
 .tag-filter-bar::-webkit-scrollbar { display: none; } /* Hide scrollbar for Chrome/Safari */

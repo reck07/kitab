@@ -130,20 +130,24 @@ body {
 }
 
 .sidebar {
-  width: 300px; /* Slightly refined width */
+  width: 300px;
   background-color: var(--bg-sidebar);
   border-right: 1px solid var(--border);
   display: flex;
   flex-direction: column;
   transition: transform 0.3s ease;
   z-index: 5;
+  min-height: 0;
+  overflow: hidden;
 }
 
 .sidebar-controls {
-  padding: 0.75rem 0.75rem 0.75rem;
+  padding: 0.75rem;
   display: flex;
   flex-direction: column;
   gap: 0.6rem;
+  flex-shrink: 0;
+  overflow: hidden;
 }
 
 /* Premium Logo (deprecated — kept for layout use) */
@@ -237,6 +241,7 @@ body {
 /* Note List */
 .note-list {
   flex: 1;
+  min-height: 0;
   overflow-y: auto;
   padding: 0.75rem;
   display: flex;
