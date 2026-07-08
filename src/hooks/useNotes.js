@@ -183,7 +183,10 @@ export function useNotes(user) {
   const filteredNotes = useMemo(() => {
     return notes.filter(n => {
       const searchableContent = isNoteLocked(n) ? '' : (n.content || '');
-      const matchesSearch = !searchQuery || n.title?.toLowerCase().includes(searchQuery.toLowerCase()) || searchableContent.toLowerCase().includes(searchQuery.toLowerCase()) || n.tags?.some(t => t.toLowerCase().includes(searchQuery.toLowerCase())) || (n.folder || '').toLowerCase().includes(searchQuery.toLowerCase());
+      const query = searchQuery?.trim();
+      const isTagSearch = query?.startsWith('#');
+      const tagQuery = isTagSearch ? query.slice(1).toLowerCase() : null;
+      const matchesSearch = !query || (isTagSearch ? n.tags?.some(t => t.toLowerCase().includes(tagQuery)) : n.title?.toLowerCase().includes(query.toLowerCase()) || searchableContent.toLowerCase().includes(query.toLowerCase()) || n.tags?.some(t => t.toLowerCase().includes(query.toLowerCase())) || (n.folder || '').toLowerCase().includes(query.toLowerCase()));
       const matchesTag = !selectedTag || n.tags?.includes(selectedTag);
       const matchesFavorites = !showFavorites || n.isFavorite;
       const matchesArchive = showTrash ? true : (showArchived ? n.isArchived : !n.isArchived);

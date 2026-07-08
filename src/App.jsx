@@ -5,7 +5,7 @@ import Navbar from './Navbar'
 import Login from './Login'
 import NoteCard from './NoteCard'
 import NoteEditor from './NoteEditor'
-import { Star, Archive, X, Palette, Layout, Shield, QrCode, Zap, Trash2, Share2, Save, FilePlus } from 'lucide-react'
+import { Star, Archive, X, Palette, Layout, Shield, QrCode, Zap, Trash2, Share2, Save, FilePlus, Search } from 'lucide-react'
 import { isNoteLocked } from './crypto'
 import Calculator from './Calculator'
 import DrawingPad from './DrawingPad'
@@ -560,7 +560,7 @@ function App() {
                 <div className="search-sort-wrapper" onFocus={() => setIsSortDropdownVisible(true)} tabIndex={-1} onBlur={() => setTimeout(() => setIsSortDropdownVisible(false), 150)}>
                   <div className="search-group">
                     <svg className="search-icon" aria-hidden="true" viewBox="0 0 24 24"><g><path d="M21.53 20.47l-3.66-3.66C19.195 15.24 20 13.214 20 11c0-4.97-4.03-9-9-9s-9 4.03-9 9 4.03 9 9 9c2.215 0 4.24-.804 5.808-2.13l3.66 3.66c.147.146.34.22.53.22s.385-.073.53-.22c.295-.293.295-.767.002-1.06zM3.5 11c0-4.135 3.365-7.5 7.5-7.5s7.5 3.365 7.5 7.5-3.365 7.5-7.5 7.5-7.5-3.365-7.5-7.5z"></path></g></svg>
-                    <input type="text" placeholder="Search notes... (Ctrl+K)" onChange={(e) => { if (debounceRef.current) clearTimeout(debounceRef.current); debounceRef.current = setTimeout(() => setSearchQuery(e.target.value), 200); }} className="search-input" />
+                    <input type="text" placeholder="Search notes or #tag... (Ctrl+K)" onChange={(e) => { if (debounceRef.current) clearTimeout(debounceRef.current); debounceRef.current = setTimeout(() => setSearchQuery(e.target.value), 200); }} className="search-input" />
                   </div>
                   <div className={`sort-dropdown ${isSortDropdownVisible ? 'visible' : ''}`}>
                     <div className="radio-inputs">
@@ -571,6 +571,7 @@ function App() {
                   </div>
                 </div>
                 <div className="hex-controls">
+                  <button className="btn-hexagon" onClick={() => setShowCommandPalette(true)} title="Command Palette (Ctrl+K)"><Search size={16} /></button>
                   <button className={`btn-hexagon ${showFavorites ? 'active' : ''}`} onClick={() => setShowFavorites(!showFavorites)} title="Show Favorites"><Star size={16} fill={showFavorites ? 'currentColor' : 'none'} /></button>
                   <button className="btn-hexagon" onClick={() => setShowSettings(true)} title="Theme Settings"><Palette size={16} /></button>
                   <button className="btn-hexagon" onClick={() => setShowQrCode(true)} title="Share via QR Code"><QrCode size={16} /></button>
@@ -580,16 +581,6 @@ function App() {
                   <button className="btn-hexagon" onClick={() => setShowSecurityPanel(true)} title="Security Settings"><Shield size={16} /></button>
                   <button className="btn-hexagon" onClick={() => setShowAutomation(true)} title="Automation Rules"><Zap size={16} /></button>
                   <button className={`btn-hexagon ${showGraph ? 'active' : ''}`} onClick={() => setShowGraph(!showGraph)} title="Knowledge Graph"><Share2 size={16} /></button>
-                </div>
-                <div className="tag-filter-bar">
-                  {allFolders.filter(Boolean).map(folder => (
-                    <span key={folder} className={`tag-pill ${selectedFolder === folder ? 'active' : ''}`} onClick={() => setSelectedFolder(selectedFolder === folder ? null : folder)}>📁 {folder}</span>
-                  ))}
-                </div>
-                <div className="tag-filter-bar">
-                  {allTags.map(tag => (
-                    <span key={tag} className={`tag-pill ${selectedTag === tag ? 'active' : ''}`} onClick={() => setSelectedTag(selectedTag === tag ? null : tag)}>{tag}</span>
-                  ))}
                 </div>
               </div>
               <div className="note-list" data-view={viewMode}>
