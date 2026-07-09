@@ -2335,8 +2335,23 @@ body {
 
 .note-list[data-view="honeycomb"] .note-card-wrap {
   overflow: visible !important;
-  margin-bottom: 32px;
+  margin-bottom: 28px;
   position: relative;
+}
+
+.note-list[data-view="honeycomb"] .note-card-wrap::after {
+  content: '';
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
+  width: 12px;
+  height: 12px;
+  background: var(--accent);
+  border: 3px solid var(--bg-sidebar);
+  border-radius: 50%;
+  z-index: 3;
+  box-shadow: 0 0 0 2px var(--border);
 }
 
 .note-list[data-view="honeycomb"] .note-card-wrap:last-child {
@@ -2353,12 +2368,12 @@ body {
   background: none !important;
   padding: 0;
   cursor: pointer;
-  gap: 40px;
+  gap: 20px;
 }
 
 .note-list[data-view="honeycomb"] .hexagon-icon {
-  width: 56px;
-  height: 64px;
+  width: 36px;
+  height: 42px;
   clip-path: polygon(50% 0%, 100% 25%, 100% 75%, 50% 100%, 0% 75%, 0% 25%);
   display: flex;
   align-items: center;
@@ -2376,7 +2391,7 @@ body {
 }
 
 .note-list[data-view="honeycomb"] .hexagon-letter {
-  font-size: 22px;
+  font-size: 14px;
   font-weight: 700;
   color: #fff;
   text-shadow: 0 1px 3px rgba(0,0,0,0.3);
@@ -2417,18 +2432,24 @@ body {
 }
 
 .note-list[data-view="honeycomb"] .note-card .note-card-icons,
-.note-list[data-view="honeycomb"] .note-card .card-tags,
 .note-list[data-view="honeycomb"] .note-card > div[style*="backgroundImage"] {
   display: none !important;
+}
+
+.note-list[data-view="honeycomb"] .note-card .card-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 4px;
 }
 
 /* Content card adjacent to hexagon */
 .note-list[data-view="honeycomb"] .note-card .timeline-content {
   display: flex;
   flex-direction: column;
-  min-width: 160px;
-  max-width: 220px;
-  padding: 12px 14px;
+  min-width: 200px;
+  max-width: 300px;
+  padding: 10px 12px;
   background: var(--bg-card);
   border: 1px solid var(--border);
   border-radius: var(--radius);
