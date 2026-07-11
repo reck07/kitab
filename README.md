@@ -16,7 +16,6 @@ A high-performance, mobile-responsive notebook application built with React 19, 
 * **Sleek UI/UX**: Full dark mode support, polished timeline views featuring compact hexagon layouts (36x42), and responsive transitions.
 * **Cross-Platform**: Built from the ground up to run seamlessly on Web and Android.
 <img width="400" height="222" alt="Screenshot 2026-07-11 134059" src="https://github.com/user-attachments/assets/1711d363-4581-4439-b4fc-1035be8c9444" />
-<img width="1329" height="815" alt="Screenshot 2026-07-11 133605" src="https://github.com/user-attachments/assets/280895b3-f607-4b28-ab34-e8afa7afbd95" />
 <img width="751" height="587" alt="Screenshot 2026-07-11 133914" src="https://github.com/user-attachments/assets/a542b534-3d69-4fbd-9d1a-7b792dc5232a" />
 <img width="407" height="859" alt="Screenshot 2026-07-11 134215" src="https://github.com/user-attachments/assets/1c98477b-8644-4523-a58c-397589c29a7b" /><img width="407" height="704" alt="Screenshot 2026-07-11 134116" src="https://github.com/user-attachments/assets/1ef9118e-2dfa-4155-983a-0e96307482e0" />
 <img width="394" height="860" alt="Screenshot 2026-07-11 134017" src="https://github.com/user-attachments/assets/d61442e0-48e1-4b26-a55f-c4322c9979f9" />
