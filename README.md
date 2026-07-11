@@ -15,6 +15,7 @@ A high-performance, mobile-responsive notebook application built with React 19, 
 * **Auto-Save**: Debounced persistence logic to keep your data safe without sacrificing mobile performance.
 * **Sleek UI/UX**: Full dark mode support, polished timeline views featuring compact hexagon layouts (36x42), and responsive transitions.
 * **Cross-Platform**: Built from the ground up to run seamlessly on Web and Android.
+<img width="398" height="556" alt="image" src="https://github.com/user-attachments/assets/15c26ef4-d988-4fe0-a780-2deeb72aee7e" />
 
 ---
 
