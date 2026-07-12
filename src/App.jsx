@@ -5,7 +5,7 @@ import Navbar from './Navbar'
 import Login from './Login'
 import NoteCard from './NoteCard'
 import NoteEditor from './NoteEditor'
-import { Star, Archive, X, Layout, Shield, QrCode, Zap, Trash2, Save, FilePlus, Search, Plus, Sun, Printer, Download, Lock, Calculator as CalcIcon, Pencil, GitBranch, Bold, Italic, Heading1, Heading2, List, MessageSquare, Image as ImageIcon, Mic, Smile, Sparkles, Palette } from 'lucide-react'
+import { Star, Archive, X, Layout, Shield, QrCode, Zap, Trash2, Save, FilePlus, Search, Plus, Sun, Printer, Download, Lock, Calculator as CalcIcon, Pencil, GitBranch, Bold, Italic, Heading1, Heading2, List, MessageSquare, Image as ImageIcon, Mic, Smile, Sparkles, Palette, Share2 } from 'lucide-react'
 import { isNoteLocked } from './crypto'
 import Calculator from './Calculator'
 import DrawingPad from './DrawingPad'
@@ -526,6 +526,14 @@ function App() {
       case 'security': setShowSecurityPanel(true); break;
       case 'automation': setShowAutomation(true); break;
       case 'settings': setShowSettings(true); break;
+      case 'share':
+        if (activeNoteForEditor) {
+          const text = activeNoteForEditor.content?.replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim() || '';
+          const shareData = { title: activeNoteForEditor.title || 'Note from Kitāb', text };
+          if (navigator.share) { navigator.share(shareData); }
+          else { navigator.clipboard.writeText(`${shareData.title}\n\n${shareData.text}`).then(() => alert("Copied to clipboard!")); }
+        }
+        break;
     }
   };
 
@@ -590,6 +598,7 @@ function App() {
       tools: [
         { icon: Plus, action: 'add', label: 'New' },
         { icon: Download, action: 'exportPDF', label: 'TXT' },
+        { icon: Share2, action: 'share', label: 'Share' },
         { icon: GitBranch, action: 'graph', label: 'Graph' },
         { icon: CalcIcon, action: 'calculator', label: 'Calc' },
         { icon: Pencil, action: 'drawing', label: 'Draw' },
@@ -776,6 +785,8 @@ function App() {
                   theme={theme}
                   allTags={allTags}
                   onAppAction={handleSidebarAction}
+                  pinnedTools={pinnedTools}
+                  onTogglePinTool={togglePinTool}
                 />
               ) : (
                 <div className="empty-state" style={{ background: 'var(--bg-card)', margin: '24px', borderRadius: 'var(--radius)', boxShadow: 'var(--shadow)', textAlign: 'center' }}>
