@@ -1,5 +1,5 @@
 import { useRef, useEffect, useState } from 'react';
-import { List, Heading1, Heading2, MessageSquare, Mic, Share2, Lock, Pin, Star, Archive, X, ArrowLeft, Image as ImageIcon, Smile, Bot, SpellCheck, FileText, ChevronRight, CheckSquare, Layout, Trash2, RotateCcw, FilePlus, Save, QrCode, Calendar, Plus, Circle, Undo2, Redo2, Search, Sun } from 'lucide-react';
+import { Bold, Italic, List, Heading1, Heading2, MessageSquare, Mic, Share2, Lock, Pin, Star, Archive, X, Image as ImageIcon, Smile, Bot, SpellCheck, FileText, ChevronRight, CheckSquare, Layout, Trash2, RotateCcw, FilePlus, QrCode, Calendar, Plus, Circle, Undo2, Redo2, Search, Sun, Printer, Download, GitBranch, Calculator as CalcIcon, Pencil, Shield, Zap, Cog, MoreHorizontal, Clock } from 'lucide-react';
 import Tesseract from 'tesseract.js';
 import { PAPER_TYPES, CANVAS_SIZES, getPaperType } from './paperTypes';
 import { suggestTags } from './autoTag';
@@ -32,6 +32,7 @@ const NoteEditor = ({
   onThemeChange,
   theme,
   allTags,
+  onAppAction,
 }) => {
   const editorRef = useRef(null);
   const fileInputRef = useRef(null);
@@ -42,6 +43,9 @@ const NoteEditor = ({
   const [grammarLoading, setGrammarLoading] = useState(false);
   const [isScanningImage, setIsScanningImage] = useState(false);
   const [isToolsOpen, setIsToolsOpen] = useState(true);
+  const [showOverflow, setShowOverflow] = useState(false);
+  const overflowRef = useRef(null);
+  const longPressTimer = useRef(null);
   const [showPaperSettings, setShowPaperSettings] = useState(false);
   const [showLayoutSettings, setShowLayoutSettings] = useState(false);
   const [wikilinks, setWikilinks] = useState([]);
@@ -62,6 +66,19 @@ const NoteEditor = ({
   const [showSearch, setShowSearch] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [searchMatchIdx, setSearchMatchIdx] = useState(0);
+  const [pinnedTools, setPinnedTools] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('kitab_pinned_tools')) || ['bold', 'italic', 'h1', 'list', 'undo', 'redo']; }
+    catch { return ['bold', 'italic', 'h1', 'list', 'undo', 'redo']; }
+  });
+  const toolbarRef = useRef(null);
+
+  useEffect(() => {
+    localStorage.setItem('kitab_pinned_tools', JSON.stringify(pinnedTools));
+  }, [pinnedTools]);
+
+  const togglePinTool = (toolId) => {
+    setPinnedTools(prev => prev.includes(toolId) ? prev.filter(t => t !== toolId) : [...prev, toolId]);
+  };
   const [isEditorFocused, setIsEditorFocused] = useState(false);
   const searchInputRef = useRef(null);
   const [tagInputValue, setTagInputValue] = useState('');
@@ -128,6 +145,26 @@ const NoteEditor = ({
     document.addEventListener('keydown', onKey);
     return () => document.removeEventListener('keydown', onKey);
   }, [handleSave]);
+
+  // Copy title to data-tooltip for instant CSS tooltips (no laggy native tooltip)
+  useEffect(() => {
+    const container = toolbarRef.current;
+    if (!container) return;
+    container.querySelectorAll('.inline-tool-btn').forEach(btn => {
+      if (btn.title && !btn.dataset.tooltip) btn.dataset.tooltip = btn.title;
+    });
+  });
+
+  useEffect(() => {
+    if (!showOverflow) return;
+    const handler = (e) => {
+      if (overflowRef.current && !overflowRef.current.contains(e.target)) {
+        setShowOverflow(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showOverflow]);
 
   const handleUndo = () => {
     document.execCommand('undo');
@@ -394,6 +431,20 @@ const NoteEditor = ({
     setShowCalendar(false);
   };
 
+  const handleTimestamp = () => {
+    if (!editorRef.current) return;
+    const now = new Date();
+    const months = ['Jan','Feb','Mar','Apr','May','Jun','Jul','Aug','Sep','Oct','Nov','Dec'];
+    const h = now.getHours(), m = now.getMinutes();
+    const ampm = h >= 12 ? 'PM' : 'AM';
+    const h12 = h % 12 || 12;
+    const mm = String(m).padStart(2, '0');
+    const ts = `${months[now.getMonth()]} ${now.getDate()}, ${now.getFullYear()} · ${h12}:${mm} ${ampm}`;
+    editorRef.current.focus();
+    document.execCommand('insertText', false, ts);
+    onUpdate(activeNote.id, { content: editorRef.current.innerHTML });
+  };
+
   const handleAudioAttach = async () => {
     if (isRecordingAudio) {
       mediaRecorderRef.current?.stop();
@@ -575,9 +626,6 @@ const NoteEditor = ({
 
   return (
     <div className="editor-wrapper">
-      {onCloseEditor && (
-        <button className="btn-icon mobile-back-button" onClick={onCloseEditor}><ArrowLeft size={20} /></button>
-      )}
       
       {showSearch && (
         <div className="editor-search-bar">
@@ -587,84 +635,9 @@ const NoteEditor = ({
           <button className="btn-icon sm" onClick={() => { clearEditorHighlight(); setShowSearch(false); setSearchQuery(''); }} title="Close"><X size={14} /></button>
         </div>
       )}
-      <div className={`text-tools-wrapper ${isToolsOpen ? '' : 'collapsed'}${!isEditorFocused ? ' dimmed' : ''}${focusMode ? ' hidden' : ''}`}>
-        <button 
-          className="text-tools-toggle" 
-          onClick={() => setIsToolsOpen(!isToolsOpen)}
-          title={isToolsOpen ? "Hide Tools" : "Show Tools"}
-        >
-          <ChevronRight size={14} style={{ transform: isToolsOpen ? 'rotate(0deg)' : 'rotate(180deg)', transition: 'transform 0.3s' }} />
-        </button>
-        <div className="text-tools">
-          <span className="toolbar-meta">{charCount}c · {wordCount}w · {readingTime}m</span>
-          <select 
-            className="font-size-select"
-            value={activeNote.fontSize || '17px'}
-            onChange={(e) => onUpdate(activeNote.id, { fontSize: e.target.value })}
-            title="Font Size"
-          >
-            <option value="13px">13</option>
-            <option value="15px">15</option>
-            <option value="17px">17</option>
-            <option value="19px">19</option>
-            <option value="21px">21</option>
-          </select>
-          <button className="btn-icon sm" onClick={() => { editorRef.current?.focus(); document.execCommand('bold'); }} title="Bold"><strong>B</strong></button>
-          <button className="btn-icon sm" onClick={() => { editorRef.current?.focus(); document.execCommand('italic'); }} title="Italic"><em>i</em></button>
-          <button className="btn-icon sm" onClick={() => { editorRef.current?.focus(); document.execCommand('insertUnorderedList'); }} title="Bullet List"><List size={15} /></button>
-          <button className="btn-icon sm" onClick={() => { editorRef.current?.focus(); document.execCommand('insertOrderedList'); }} title="Numbered List"><CheckSquare size={15} /></button>
-          <button className="btn-icon sm" onClick={() => { editorRef.current?.focus(); document.execCommand('formatBlock', false, 'h1'); editorRef.current?.focus(); }} title="Heading 1"><Heading1 size={15} /></button>
-          <button className="btn-icon sm" onClick={() => { editorRef.current?.focus(); document.execCommand('formatBlock', false, 'h2'); editorRef.current?.focus(); }} title="Heading 2"><Heading2 size={15} /></button>
-          <button className="btn-icon sm" onClick={() => { editorRef.current?.focus(); document.execCommand('formatBlock', false, 'blockquote'); }} title="Quote"><MessageSquare size={15} /></button>
-          <button className="btn-icon sm" onClick={() => { editorRef.current?.focus(); document.execCommand('insertHorizontalRule'); }} title="Divider">—</button>
-          <div className="toolbar-divider"></div>
-          <button className="btn-icon sm" onClick={handleUndo} title="Undo"><Undo2 size={15} /></button>
-          <button className="btn-icon sm" onClick={handleRedo} title="Redo"><Redo2 size={15} /></button>
-          <button className="btn-icon sm" onClick={() => { setShowSearch(!showSearch); if (!showSearch) setTimeout(() => searchInputRef.current?.focus(), 100); }} title="Search" style={{ color: showSearch ? 'var(--accent)' : 'var(--text-muted)' }}><Search size={15} /></button>
-          <button className="btn-icon sm" onClick={onThemeChange} title="warm light, not bright" style={{ color: 'var(--text-muted)' }}><Sun size={15} /></button>
-          <div className="toolbar-divider"></div>
-          <button className="btn-icon sm" onClick={handleVoiceInput} title="Voice Input" style={{ color: isRecording ? 'var(--danger)' : 'var(--text-muted)' }}><Mic size={15} /></button>
-          <button className="btn-icon sm" onClick={handleShare} title="Share"><Share2 size={15} /></button>
-          <button className="btn-icon sm" onClick={() => fileInputRef.current?.click()} title="Insert Image"><ImageIcon size={15} /></button>
-          <input type="file" ref={fileInputRef} accept="image/*" onChange={handleImageUpload} style={{ display: 'none' }} />
-          <button className={`btn-icon sm ${isRefreshing ? 'refreshing' : ''}`} onClick={handleMindRefresh} title="🌸 Mind Refresh" style={{ color: 'var(--text-muted)' }}><RotateCcw size={15} /></button>
-          <div className="toolbar-divider"></div>
-          <button className="btn-icon sm" onClick={() => { setShowQRCode(!showQRCode); setShowCalendar(false); setShowTodo(false); }} title="QR Code"><QrCode size={15} /></button>
-          <button className="btn-icon sm" onClick={() => { setShowCalendar(!showCalendar); setShowQRCode(false); setShowTodo(false); }} title="Calendar"><Calendar size={15} /></button>
-          <button className="btn-icon sm" onClick={() => { setShowTodo(!showTodo); setShowQRCode(false); setShowCalendar(false); }} title="Todo List"><CheckSquare size={15} /></button>
-          <button className="btn-icon sm" onClick={handleAudioAttach} title={isRecordingAudio ? 'Stop Recording' : 'Attach Voice'} style={{ color: isRecordingAudio ? 'var(--danger)' : 'var(--text-muted)' }}><Mic size={15} /></button>
-          <div className="toolbar-divider"></div>
-          <button className="btn-icon sm" onClick={handleGrammarCheck} title="Grammar Check"><SpellCheck size={15} /></button>
-          <button className="btn-icon sm" onClick={() => setShowEmojiPicker(!showEmojiPicker)} title="Emoji"><Smile size={15} /></button>
-          <div className="toolbar-divider"></div>
-          <button className="btn-icon sm" onClick={() => setShowPaperSettings(!showPaperSettings)} title="Paper"><FileText size={15} /></button>
-          <button className="btn-icon sm" onClick={() => setShowLayoutSettings(!showLayoutSettings)} title="Size"><Layout size={15} /></button>
-          <button className="btn-icon sm" onClick={() => window.open('https://gemini.google.com', '_blank')} title="AI"><Bot size={15} /></button>
-          <button className="btn-icon sm" onClick={onToggleFocus} title="Focus Mode" style={{ opacity: focusMode ? 1 : 0.5 }}><Layout size={15} /></button>
-          <div className="toolbar-divider"></div>
-          <button className="btn-icon sm" onClick={onSaveTemplate} title="Save as Template"><FileText size={15} /></button>
-          <button className="btn-icon sm" onClick={onLoadTemplate} title="New from Template"><FilePlus size={15} /></button>
-          <div className="toolbar-divider"></div>
-          {!activeNote.isRecycled && (<>
-            <button className="btn-icon sm" onClick={() => onTogglePin?.(activeNote.id)} title={activeNote.isPinned ? 'Unpin' : 'Pin'} style={{ color: activeNote.isPinned ? 'var(--accent)' : undefined }}>
-              <Pin size={13} fill={activeNote.isPinned ? 'currentColor' : 'none'} />
-            </button>
-            <button className="btn-icon sm" onClick={() => onToggleFavorite?.(activeNote.id)} title={activeNote.isFavorite ? 'Unfavorite' : 'Favorite'} style={{ color: activeNote.isFavorite ? 'var(--accent)' : undefined }}>
-              <Star size={13} fill={activeNote.isFavorite ? 'currentColor' : 'none'} />
-            </button>
-            <button className="btn-icon sm" onClick={() => onToggleArchive?.(activeNote.id)} title={activeNote.isArchived ? 'Unarchive' : 'Archive'}>
-              <Archive size={13} />
-            </button>
-            <button className="btn-icon sm" onClick={() => onDelete?.(activeNote.id)} title="Move to trash">
-              <Trash2 size={13} />
-            </button>
-            {activeNote.isLocked && <Lock size={12} />}
-            <div className="toolbar-divider"></div>
-          </>)}
-          {isRecording && <span className="rec-badge">🔴</span>}
-          {isScanningImage && <span className="scan-badge">📸</span>}
-        </div>
-      </div>
+      <input type="file" ref={fileInputRef} accept="image/*" onChange={handleImageUpload} style={{ display: 'none' }} />
+      {isRecording && <span className="rec-badge">🔴</span>}
+      {isScanningImage && <span className="scan-badge">📸</span>}
 
       {isRefreshing && (
         <div className="mind-refresh-overlay">
@@ -787,46 +760,26 @@ const NoteEditor = ({
               }}
               placeholder="Untitled Note"
             />
+</div>
+        {justSaved && (
+          <div className="save-indicator" style={{ color: 'var(--accent)', fontSize: '12px', marginRight: '12px', transition: 'opacity 0.5s', animation: 'fadeInOut 2s' }}>
+            Saved!
           </div>
-          {justSaved && (
-            <div className="save-indicator" style={{ color: 'var(--accent)', fontSize: '12px', marginRight: '12px', transition: 'opacity 0.5s', animation: 'fadeInOut 2s' }}>
-              Saved!
-            </div>
-          )}
-          {!activeNote.isRecycled && (
-            <div className="tags-inline">
-              {activeNote.tags?.map(tag => (
-                <span key={tag} className="tag-badge">
-                  {tag}
-                  <button className="remove-tag-btn" onClick={() => handleRemoveTagClick(tag)}>×</button>
-                </span>
-              ))}
-              <div className="tag-input-wrapper" style={{ position: 'relative', display: 'inline-flex' }}>
-                <input ref={tagInputRef} type="text" className="tag-input" placeholder="tag" value={tagInputValue} onChange={e => { const val = e.target.value; setTagInputValue(val); if (val.startsWith('#')) { const q = val.slice(1).toLowerCase(); const matches = (allTags || []).filter(t => t.toLowerCase().includes(q) && !activeNote.tags?.includes(t)).slice(0, 6); setTagSuggestions(matches); setSelectedSuggestionIdx(-1); } else { setTagSuggestions([]); } }} onKeyDown={e => { if (e.key === 'Enter') { if (tagSuggestions.length > 0 && selectedSuggestionIdx >= 0) { const tag = tagSuggestions[selectedSuggestionIdx]; if (tag && !activeNote.tags?.includes(tag)) { onUpdate(activeNote.id, { tags: [...(activeNote.tags || []), tag] }); } setTagInputValue(''); setTagSuggestions([]); return; } handleTagInput(e); setTagInputValue(''); } else if (e.key === 'ArrowDown') { e.preventDefault(); setSelectedSuggestionIdx(i => Math.min(i + 1, tagSuggestions.length - 1)); } else if (e.key === 'ArrowUp') { e.preventDefault(); setSelectedSuggestionIdx(i => Math.max(i - 1, 0)); } else if (e.key === 'Escape') { setTagSuggestions([]); } }} />
-                {tagSuggestions.length > 0 && (
-                  <div style={{ position: 'absolute', top: '100%', left: 0, minWidth: 140, background: 'var(--bg-app)', border: '1px solid var(--border)', borderRadius: 8, boxShadow: '0 8px 24px rgba(0,0,0,0.15)', zIndex: 100, padding: '4px 0', marginTop: 2 }}>
-                    {tagSuggestions.map((tag, idx) => (
-                      <div key={tag} style={{ padding: '5px 12px', fontSize: 12, cursor: 'pointer', background: idx === selectedSuggestionIdx ? 'var(--bg-active)' : 'transparent', display: 'flex', alignItems: 'center', gap: 6 }} onClick={() => { if (!activeNote.tags?.includes(tag)) { onUpdate(activeNote.id, { tags: [...(activeNote.tags || []), tag] }); } setTagInputValue(''); setTagSuggestions([]); }} onMouseEnter={() => setSelectedSuggestionIdx(idx)}>
-                        <span>#</span>{tag}
-                      </div>
-                    ))}
-                  </div>
-                )}
-              </div>
-              <button className="btn-icon sm" onClick={() => {
-                const suggestions = suggestTags(activeNote);
-                suggestions.forEach(tag => {
-                  if (!activeNote.tags?.includes(tag)) {
-                    const updatedTags = [...(activeNote.tags || []), tag];
-                    onUpdate(activeNote.id, { tags: updatedTags });
-                  }
-                });
-                if (suggestions.length === 0) alert('No new tag suggestions found');
-              }} title="Auto-suggest tags"><span style={{ fontSize: 13 }}>✨</span></button>
-            </div>
-          )}
-        </div>
-        {activeNote.isRecycled && (
+        )}
+        {!activeNote.isRecycled && (
+          <button className="btn-icon sm" onClick={() => {
+            const suggestions = suggestTags(activeNote);
+            suggestions.forEach(tag => {
+              if (!activeNote.tags?.includes(tag)) {
+                const updatedTags = [...(activeNote.tags || []), tag];
+                onUpdate(activeNote.id, { tags: updatedTags });
+              }
+            });
+            if (suggestions.length === 0) alert('No new tag suggestions found');
+          }} title="Auto-suggest tags"><span style={{ fontSize: 13 }}>✨</span></button>
+        )}
+      </div>
+      {activeNote.isRecycled && (
           <div className="trash-notice">
             This note is in trash. <button className="btn-link" onClick={() => onRestore?.(activeNote.id)}>Restore</button> or <button className="btn-link danger" onClick={() => onPermanentDelete?.(activeNote.id)}>delete permanently</button>
           </div>
@@ -848,6 +801,166 @@ const NoteEditor = ({
               </div>
             )}
 
+            <div className="editor-inline-toolbar">
+              <span className="toolbar-badge">{charCount}c · {wordCount}w</span>
+              <select
+                className="toolbar-font-select"
+                value={activeNote.fontSize || '17px'}
+                onChange={(e) => onUpdate(activeNote.id, { fontSize: e.target.value })}
+                title="Font Size"
+              >
+                <option value="13px">13</option>
+                <option value="15px">15</option>
+                <option value="17px">17</option>
+                <option value="19px">19</option>
+                <option value="21px">21</option>
+              </select>
+              <span className="inline-tool-divider" />
+              <div className="toolbar-scroll-wrap" ref={toolbarRef}
+                onPointerDown={(e) => {
+                  const btn = e.target.closest('.inline-tool-btn, .overflow-tool-btn');
+                  if (!btn) return;
+                  longPressTimer.current = setTimeout(() => {
+                    const tool = btn.dataset.tool;
+                    if (tool) { togglePinTool(tool); btn.dataset.lp = '1'; }
+                  }, 400);
+                }}
+                onPointerUp={(e) => {
+                  if (longPressTimer.current) { clearTimeout(longPressTimer.current); longPressTimer.current = null; }
+                }}
+                onPointerLeave={() => {
+                  if (longPressTimer.current) { clearTimeout(longPressTimer.current); longPressTimer.current = null; }
+                }}
+                onClickCapture={(e) => {
+                  const btn = e.target.closest('.inline-tool-btn, .overflow-tool-btn');
+                  if (btn && btn.dataset.lp === '1') {
+                    delete btn.dataset.lp;
+                    e.stopPropagation();
+                    e.preventDefault();
+                  }
+                }}
+              >
+                <div className="toolbar-pinned">
+                  {pinnedTools.includes('bold') && (<button className="inline-tool-btn" data-tool="bold" onClick={() => { editorRef.current?.focus(); document.execCommand('bold'); }} title="Bold" onContextMenu={(e) => { e.preventDefault(); togglePinTool('bold'); }}><Bold size={16} strokeWidth={2} /></button>)}
+                  {pinnedTools.includes('timestamp') && (<button className="inline-tool-btn" data-tool="timestamp" onClick={handleTimestamp} title="Timestamp" onContextMenu={(e) => { e.preventDefault(); togglePinTool('timestamp'); }}><Clock size={16} strokeWidth={2} /></button>)}
+                  {pinnedTools.includes('italic') && (<button className="inline-tool-btn" data-tool="italic" onClick={() => { editorRef.current?.focus(); document.execCommand('italic'); }} title="Italic" onContextMenu={(e) => { e.preventDefault(); togglePinTool('italic'); }}><Italic size={16} strokeWidth={2} /></button>)}
+                  {pinnedTools.includes('h1') && (<button className="inline-tool-btn" data-tool="h1" onClick={() => { editorRef.current?.focus(); document.execCommand('formatBlock', false, 'h1'); editorRef.current?.focus(); }} title="Heading 1" onContextMenu={(e) => { e.preventDefault(); togglePinTool('h1'); }}><Heading1 size={16} strokeWidth={2} /></button>)}
+                  {pinnedTools.includes('list') && (<button className="inline-tool-btn" data-tool="list" onClick={() => { editorRef.current?.focus(); document.execCommand('insertUnorderedList'); }} title="Bullet List" onContextMenu={(e) => { e.preventDefault(); togglePinTool('list'); }}><List size={16} strokeWidth={2} /></button>)}
+                  {pinnedTools.includes('undo') && (<button className="inline-tool-btn" data-tool="undo" onClick={handleUndo} title="Undo" onContextMenu={(e) => { e.preventDefault(); togglePinTool('undo'); }}><Undo2 size={16} strokeWidth={2} /></button>)}
+                  {pinnedTools.includes('redo') && (<button className="inline-tool-btn" data-tool="redo" onClick={handleRedo} title="Redo" onContextMenu={(e) => { e.preventDefault(); togglePinTool('redo'); }}><Redo2 size={16} strokeWidth={2} /></button>)}
+                  {pinnedTools.includes('h2') && (<button className="inline-tool-btn" data-tool="h2" onClick={() => { editorRef.current?.focus(); document.execCommand('formatBlock', false, 'h2'); editorRef.current?.focus(); }} title="Heading 2" onContextMenu={(e) => { e.preventDefault(); togglePinTool('h2'); }}><Heading2 size={16} strokeWidth={2} /></button>)}
+                  {pinnedTools.includes('quote') && (<button className="inline-tool-btn" data-tool="quote" onClick={() => { editorRef.current?.focus(); document.execCommand('formatBlock', false, 'blockquote'); }} title="Quote" onContextMenu={(e) => { e.preventDefault(); togglePinTool('quote'); }}><MessageSquare size={16} strokeWidth={2} /></button>)}
+                  {pinnedTools.includes('numlist') && (<button className="inline-tool-btn" data-tool="numlist" onClick={() => { editorRef.current?.focus(); document.execCommand('insertOrderedList'); }} title="Numbered List" onContextMenu={(e) => { e.preventDefault(); togglePinTool('numlist'); }}><CheckSquare size={16} strokeWidth={2} /></button>)}
+                  {pinnedTools.includes('hr') && (<button className="inline-tool-btn" data-tool="hr" onClick={() => { editorRef.current?.focus(); document.execCommand('insertHorizontalRule'); }} title="Divider" onContextMenu={(e) => { e.preventDefault(); togglePinTool('hr'); }}><span className="toolbar-hr-icon">—</span></button>)}
+                  {pinnedTools.includes('image') && (<button className="inline-tool-btn" data-tool="image" onClick={() => fileInputRef.current?.click()} title="Image" onContextMenu={(e) => { e.preventDefault(); togglePinTool('image'); }}><ImageIcon size={16} strokeWidth={2} /></button>)}
+                  {pinnedTools.includes('voice') && (<button className={`inline-tool-btn${isRecording ? ' recording' : ''}`} data-tool="voice" onClick={handleVoiceInput} title="Voice Input" onContextMenu={(e) => { e.preventDefault(); togglePinTool('voice'); }}><Mic size={16} strokeWidth={2} /></button>)}
+                  {pinnedTools.includes('emoji') && (<button className="inline-tool-btn" data-tool="emoji" onClick={() => setShowEmojiPicker(!showEmojiPicker)} title="Emoji" onContextMenu={(e) => { e.preventDefault(); togglePinTool('emoji'); }}><Smile size={16} strokeWidth={2} /></button>)}
+                  {pinnedTools.includes('grammar') && (<button className="inline-tool-btn" data-tool="grammar" onClick={handleGrammarCheck} title="Grammar" onContextMenu={(e) => { e.preventDefault(); togglePinTool('grammar'); }}><SpellCheck size={16} strokeWidth={2} /></button>)}
+                  {pinnedTools.includes('search') && (<button className={`inline-tool-btn${showSearch ? ' active' : ''}`} data-tool="search" onClick={() => { setShowSearch(!showSearch); if (!showSearch) setTimeout(() => searchInputRef.current?.focus(), 100); }} title="Search" onContextMenu={(e) => { e.preventDefault(); togglePinTool('search'); }}><Search size={16} strokeWidth={2} /></button>)}
+                  {pinnedTools.includes('theme') && (<button className="inline-tool-btn" data-tool="theme" onClick={onThemeChange} title="Theme" onContextMenu={(e) => { e.preventDefault(); togglePinTool('theme'); }}><Sun size={16} strokeWidth={2} /></button>)}
+                  {pinnedTools.includes('focus') && (<button className={`inline-tool-btn${focusMode ? ' active' : ''}`} data-tool="focus" onClick={onToggleFocus} title="Focus" onContextMenu={(e) => { e.preventDefault(); togglePinTool('focus'); }}><Layout size={16} strokeWidth={2} /></button>)}
+                  {!activeNote.isRecycled && pinnedTools.includes('note-pin') && (<button className={`inline-tool-btn${activeNote.isPinned ? ' active' : ''}`} data-tool="note-pin" onClick={() => onTogglePin?.(activeNote.id)} title={activeNote.isPinned ? 'Unpin' : 'Pin'} onContextMenu={(e) => { e.preventDefault(); togglePinTool('note-pin'); }}><Pin size={16} strokeWidth={2} fill={activeNote.isPinned ? 'currentColor' : 'none'} /></button>)}
+                  {!activeNote.isRecycled && pinnedTools.includes('fave') && (<button className={`inline-tool-btn${activeNote.isFavorite ? ' active' : ''}`} data-tool="fave" onClick={() => onToggleFavorite?.(activeNote.id)} title={activeNote.isFavorite ? 'Unfavorite' : 'Favorite'} onContextMenu={(e) => { e.preventDefault(); togglePinTool('fave'); }}><Star size={16} strokeWidth={2} fill={activeNote.isFavorite ? 'currentColor' : 'none'} /></button>)}
+                  {!activeNote.isRecycled && pinnedTools.includes('archive') && (<button className="inline-tool-btn" data-tool="archive" onClick={() => onToggleArchive?.(activeNote.id)} title={activeNote.isArchived ? 'Unarchive' : 'Archive'} onContextMenu={(e) => { e.preventDefault(); togglePinTool('archive'); }}><Archive size={16} strokeWidth={2} /></button>)}
+                  {!activeNote.isRecycled && pinnedTools.includes('delete') && (<button className="inline-tool-btn" data-tool="delete" onClick={() => onDelete?.(activeNote.id)} title="Delete" onContextMenu={(e) => { e.preventDefault(); togglePinTool('delete'); }} style={{ color: '#e25c5c' }}><Trash2 size={16} strokeWidth={2} /></button>)}
+                  {pinnedTools.includes('command') && (<button className="inline-tool-btn" data-tool="command" onClick={() => onAppAction?.('command')} title="Commands" onContextMenu={(e) => { e.preventDefault(); togglePinTool('command'); }}><Search size={16} strokeWidth={2} /></button>)}
+                  {pinnedTools.includes('add') && (<button className="inline-tool-btn" data-tool="add" onClick={() => onAppAction?.('add')} title="New Note" onContextMenu={(e) => { e.preventDefault(); togglePinTool('add'); }}><FilePlus size={16} strokeWidth={2} /></button>)}
+                  {pinnedTools.includes('exportPDF') && (<button className="inline-tool-btn" data-tool="exportPDF" onClick={() => onAppAction?.('exportPDF')} title="Print" onContextMenu={(e) => { e.preventDefault(); togglePinTool('exportPDF'); }}><Printer size={16} strokeWidth={2} /></button>)}
+                  {pinnedTools.includes('exportJSON') && (<button className="inline-tool-btn" data-tool="exportJSON" onClick={() => onAppAction?.('exportJSON')} title="Export JSON" onContextMenu={(e) => { e.preventDefault(); togglePinTool('exportJSON'); }}><Download size={16} strokeWidth={2} /></button>)}
+                  {pinnedTools.includes('share') && (<button className="inline-tool-btn" data-tool="share" onClick={handleShare} title="Share Note" onContextMenu={(e) => { e.preventDefault(); togglePinTool('share'); }}><Share2 size={16} strokeWidth={2} /></button>)}
+                  {pinnedTools.includes('graph') && (<button className="inline-tool-btn" data-tool="graph" onClick={() => onAppAction?.('graph')} title="Knowledge Graph" onContextMenu={(e) => { e.preventDefault(); togglePinTool('graph'); }}><GitBranch size={16} strokeWidth={2} /></button>)}
+                  {pinnedTools.includes('calculator') && (<button className="inline-tool-btn" data-tool="calculator" onClick={() => onAppAction?.('calculator')} title="Calculator" onContextMenu={(e) => { e.preventDefault(); togglePinTool('calculator'); }}><CalcIcon size={16} strokeWidth={2} /></button>)}
+                  {pinnedTools.includes('drawing') && (<button className="inline-tool-btn" data-tool="drawing" onClick={() => onAppAction?.('drawing')} title="Drawing Pad" onContextMenu={(e) => { e.preventDefault(); togglePinTool('drawing'); }}><Pencil size={16} strokeWidth={2} /></button>)}
+                  {pinnedTools.includes('lock') && (<button className="inline-tool-btn" data-tool="lock" onClick={() => onAppAction?.('lock')} title="Lock Note" onContextMenu={(e) => { e.preventDefault(); togglePinTool('lock'); }}><Lock size={16} strokeWidth={2} /></button>)}
+                  {pinnedTools.includes('favorites') && (<button className="inline-tool-btn" data-tool="favorites" onClick={() => onAppAction?.('favorites')} title="Favorites" onContextMenu={(e) => { e.preventDefault(); togglePinTool('favorites'); }}><Star size={16} strokeWidth={2} /></button>)}
+                  {pinnedTools.includes('trash') && (<button className="inline-tool-btn" data-tool="trash" onClick={() => onAppAction?.('trash')} title="Trash" onContextMenu={(e) => { e.preventDefault(); togglePinTool('trash'); }}><Trash2 size={16} strokeWidth={2} /></button>)}
+                  {pinnedTools.includes('qrcode') && (<button className="inline-tool-btn" data-tool="qrcode" onClick={() => onAppAction?.('qrcode')} title="QR Code" onContextMenu={(e) => { e.preventDefault(); togglePinTool('qrcode'); }}><QrCode size={16} strokeWidth={2} /></button>)}
+                  {pinnedTools.includes('layout') && (<button className="inline-tool-btn" data-tool="layout" onClick={() => onAppAction?.('layout')} title="Layout" onContextMenu={(e) => { e.preventDefault(); togglePinTool('layout'); }}><Layout size={16} strokeWidth={2} /></button>)}
+                  {pinnedTools.includes('security') && (<button className="inline-tool-btn" data-tool="security" onClick={() => onAppAction?.('security')} title="Security" onContextMenu={(e) => { e.preventDefault(); togglePinTool('security'); }}><Shield size={16} strokeWidth={2} /></button>)}
+                  {pinnedTools.includes('automation') && (<button className="inline-tool-btn" data-tool="automation" onClick={() => onAppAction?.('automation')} title="Automation" onContextMenu={(e) => { e.preventDefault(); togglePinTool('automation'); }}><Zap size={16} strokeWidth={2} /></button>)}
+                  {pinnedTools.includes('refresh') && (<button className="inline-tool-btn" data-tool="refresh" onClick={handleMindRefresh} title="Mind Refresh" onContextMenu={(e) => { e.preventDefault(); togglePinTool('refresh'); }}><RotateCcw size={16} strokeWidth={2} /></button>)}
+                  {pinnedTools.includes('settings') && (<button className="inline-tool-btn" data-tool="settings" onClick={() => onAppAction?.('settings')} title="Settings" onContextMenu={(e) => { e.preventDefault(); togglePinTool('settings'); }}><Cog size={16} strokeWidth={2} /></button>)}
+                </div>
+                {pinnedTools.length > 0 && <span className="inline-tool-divider" />}
+                <div className="toolbar-scroll">
+                  {!pinnedTools.includes('bold') && (<button className="inline-tool-btn" data-tool="bold" onClick={() => { editorRef.current?.focus(); document.execCommand('bold'); }} title="Bold" onContextMenu={(e) => { e.preventDefault(); togglePinTool('bold'); }}><Bold size={16} strokeWidth={2} /></button>)}
+                  {!pinnedTools.includes('italic') && (<button className="inline-tool-btn" data-tool="italic" onClick={() => { editorRef.current?.focus(); document.execCommand('italic'); }} title="Italic" onContextMenu={(e) => { e.preventDefault(); togglePinTool('italic'); }}><Italic size={16} strokeWidth={2} /></button>)}
+                  {!pinnedTools.includes('h1') && (<button className="inline-tool-btn" data-tool="h1" onClick={() => { editorRef.current?.focus(); document.execCommand('formatBlock', false, 'h1'); editorRef.current?.focus(); }} title="Heading 1" onContextMenu={(e) => { e.preventDefault(); togglePinTool('h1'); }}><Heading1 size={16} strokeWidth={2} /></button>)}
+                  {!pinnedTools.includes('list') && (<button className="inline-tool-btn" data-tool="list" onClick={() => { editorRef.current?.focus(); document.execCommand('insertUnorderedList'); }} title="Bullet List" onContextMenu={(e) => { e.preventDefault(); togglePinTool('list'); }}><List size={16} strokeWidth={2} /></button>)}
+                  <span className="inline-tool-divider" />
+                  {!pinnedTools.includes('undo') && (<button className="inline-tool-btn" data-tool="undo" onClick={handleUndo} title="Undo" onContextMenu={(e) => { e.preventDefault(); togglePinTool('undo'); }}><Undo2 size={16} strokeWidth={2} /></button>)}
+                  {!pinnedTools.includes('redo') && (<button className="inline-tool-btn" data-tool="redo" onClick={handleRedo} title="Redo" onContextMenu={(e) => { e.preventDefault(); togglePinTool('redo'); }}><Redo2 size={16} strokeWidth={2} /></button>)}
+                  {pinnedTools.includes('timestamp') && (<button className="inline-tool-btn" data-tool="timestamp" onClick={handleTimestamp} title="Timestamp" onContextMenu={(e) => { e.preventDefault(); togglePinTool('timestamp'); }}><Clock size={16} strokeWidth={2} /></button>)}
+                  {!pinnedTools.includes('timestamp') && (<button className="inline-tool-btn" data-tool="timestamp" onClick={handleTimestamp} title="Timestamp" onContextMenu={(e) => { e.preventDefault(); togglePinTool('timestamp'); }}><Clock size={16} strokeWidth={2} /></button>)}
+                  <span className="inline-tool-divider" />
+                  {pinnedTools.includes('h2') && (<button className="inline-tool-btn" data-tool="h2" onClick={() => { editorRef.current?.focus(); document.execCommand('formatBlock', false, 'h2'); editorRef.current?.focus(); }} title="Heading 2" onContextMenu={(e) => { e.preventDefault(); togglePinTool('h2'); }}><Heading2 size={16} strokeWidth={2} /></button>)}
+                  {!pinnedTools.includes('h2') && (<button className="inline-tool-btn" data-tool="h2" onClick={() => { editorRef.current?.focus(); document.execCommand('formatBlock', false, 'h2'); editorRef.current?.focus(); }} title="Heading 2" onContextMenu={(e) => { e.preventDefault(); togglePinTool('h2'); }}><Heading2 size={16} strokeWidth={2} /></button>)}
+                  {pinnedTools.includes('quote') && (<button className="inline-tool-btn" data-tool="quote" onClick={() => { editorRef.current?.focus(); document.execCommand('formatBlock', false, 'blockquote'); }} title="Quote" onContextMenu={(e) => { e.preventDefault(); togglePinTool('quote'); }}><MessageSquare size={16} strokeWidth={2} /></button>)}
+                  {!pinnedTools.includes('quote') && (<button className="inline-tool-btn" data-tool="quote" onClick={() => { editorRef.current?.focus(); document.execCommand('formatBlock', false, 'blockquote'); }} title="Quote" onContextMenu={(e) => { e.preventDefault(); togglePinTool('quote'); }}><MessageSquare size={16} strokeWidth={2} /></button>)}
+                  {pinnedTools.includes('numlist') && (<button className="inline-tool-btn" data-tool="numlist" onClick={() => { editorRef.current?.focus(); document.execCommand('insertOrderedList'); }} title="Numbered List" onContextMenu={(e) => { e.preventDefault(); togglePinTool('numlist'); }}><CheckSquare size={16} strokeWidth={2} /></button>)}
+                  {!pinnedTools.includes('numlist') && (<button className="inline-tool-btn" data-tool="numlist" onClick={() => { editorRef.current?.focus(); document.execCommand('insertOrderedList'); }} title="Numbered List" onContextMenu={(e) => { e.preventDefault(); togglePinTool('numlist'); }}><CheckSquare size={16} strokeWidth={2} /></button>)}
+                  {pinnedTools.includes('hr') && (<button className="inline-tool-btn" data-tool="hr" onClick={() => { editorRef.current?.focus(); document.execCommand('insertHorizontalRule'); }} title="Divider" onContextMenu={(e) => { e.preventDefault(); togglePinTool('hr'); }}><span className="toolbar-hr-icon">—</span></button>)}
+                  {!pinnedTools.includes('hr') && (<button className="inline-tool-btn" data-tool="hr" onClick={() => { editorRef.current?.focus(); document.execCommand('insertHorizontalRule'); }} title="Divider" onContextMenu={(e) => { e.preventDefault(); togglePinTool('hr'); }}><span className="toolbar-hr-icon">—</span></button>)}
+                  <span className="inline-tool-divider" />
+                  {pinnedTools.includes('image') && (<button className="inline-tool-btn" data-tool="image" onClick={() => fileInputRef.current?.click()} title="Image" onContextMenu={(e) => { e.preventDefault(); togglePinTool('image'); }}><ImageIcon size={16} strokeWidth={2} /></button>)}
+                  {!pinnedTools.includes('image') && (<button className="inline-tool-btn" data-tool="image" onClick={() => fileInputRef.current?.click()} title="Image" onContextMenu={(e) => { e.preventDefault(); togglePinTool('image'); }}><ImageIcon size={16} strokeWidth={2} /></button>)}
+                  {pinnedTools.includes('voice') && (<button className={`inline-tool-btn${isRecording ? ' recording' : ''}`} data-tool="voice" onClick={handleVoiceInput} title="Voice Input" onContextMenu={(e) => { e.preventDefault(); togglePinTool('voice'); }}><Mic size={16} strokeWidth={2} /></button>)}
+                  {!pinnedTools.includes('voice') && (<button className={`inline-tool-btn${isRecording ? ' recording' : ''}`} data-tool="voice" onClick={handleVoiceInput} title="Voice Input" onContextMenu={(e) => { e.preventDefault(); togglePinTool('voice'); }}><Mic size={16} strokeWidth={2} /></button>)}
+                  {pinnedTools.includes('emoji') && (<button className="inline-tool-btn" data-tool="emoji" onClick={() => setShowEmojiPicker(!showEmojiPicker)} title="Emoji" onContextMenu={(e) => { e.preventDefault(); togglePinTool('emoji'); }}><Smile size={16} strokeWidth={2} /></button>)}
+                  {!pinnedTools.includes('emoji') && (<button className="inline-tool-btn" data-tool="emoji" onClick={() => setShowEmojiPicker(!showEmojiPicker)} title="Emoji" onContextMenu={(e) => { e.preventDefault(); togglePinTool('emoji'); }}><Smile size={16} strokeWidth={2} /></button>)}
+                  {pinnedTools.includes('grammar') && (<button className="inline-tool-btn" data-tool="grammar" onClick={handleGrammarCheck} title="Grammar" onContextMenu={(e) => { e.preventDefault(); togglePinTool('grammar'); }}><SpellCheck size={16} strokeWidth={2} /></button>)}
+                  {!pinnedTools.includes('grammar') && (<button className="inline-tool-btn" data-tool="grammar" onClick={handleGrammarCheck} title="Grammar" onContextMenu={(e) => { e.preventDefault(); togglePinTool('grammar'); }}><SpellCheck size={16} strokeWidth={2} /></button>)}
+                  <span className="inline-tool-divider" />
+                  {pinnedTools.includes('search') && (<button className={`inline-tool-btn${showSearch ? ' active' : ''}`} data-tool="search" onClick={() => { setShowSearch(!showSearch); if (!showSearch) setTimeout(() => searchInputRef.current?.focus(), 100); }} title="Search" onContextMenu={(e) => { e.preventDefault(); togglePinTool('search'); }}><Search size={16} strokeWidth={2} /></button>)}
+                  {!pinnedTools.includes('search') && (<button className={`inline-tool-btn${showSearch ? ' active' : ''}`} data-tool="search" onClick={() => { setShowSearch(!showSearch); if (!showSearch) setTimeout(() => searchInputRef.current?.focus(), 100); }} title="Search" onContextMenu={(e) => { e.preventDefault(); togglePinTool('search'); }}><Search size={16} strokeWidth={2} /></button>)}
+                  {pinnedTools.includes('theme') && (<button className="inline-tool-btn" data-tool="theme" onClick={onThemeChange} title="Theme" onContextMenu={(e) => { e.preventDefault(); togglePinTool('theme'); }}><Sun size={16} strokeWidth={2} /></button>)}
+                  {!pinnedTools.includes('theme') && (<button className="inline-tool-btn" data-tool="theme" onClick={onThemeChange} title="Theme" onContextMenu={(e) => { e.preventDefault(); togglePinTool('theme'); }}><Sun size={16} strokeWidth={2} /></button>)}
+                  {pinnedTools.includes('focus') && (<button className={`inline-tool-btn${focusMode ? ' active' : ''}`} data-tool="focus" onClick={onToggleFocus} title="Focus" onContextMenu={(e) => { e.preventDefault(); togglePinTool('focus'); }}><Layout size={16} strokeWidth={2} /></button>)}
+                  {!pinnedTools.includes('focus') && (<button className={`inline-tool-btn${focusMode ? ' active' : ''}`} data-tool="focus" onClick={onToggleFocus} title="Focus" onContextMenu={(e) => { e.preventDefault(); togglePinTool('focus'); }}><Layout size={16} strokeWidth={2} /></button>)}
+                  {!activeNote.isRecycled && (
+                    <>
+                      <span className="inline-tool-divider" />
+                      {pinnedTools.includes('note-pin') && (<button className={`inline-tool-btn${activeNote.isPinned ? ' active' : ''}`} data-tool="note-pin" onClick={() => onTogglePin?.(activeNote.id)} title={activeNote.isPinned ? 'Unpin' : 'Pin'} onContextMenu={(e) => { e.preventDefault(); togglePinTool('note-pin'); }}><Pin size={16} strokeWidth={2} fill={activeNote.isPinned ? 'currentColor' : 'none'} /></button>)}
+                      {!pinnedTools.includes('note-pin') && (<button className={`inline-tool-btn${activeNote.isPinned ? ' active' : ''}`} data-tool="note-pin" onClick={() => onTogglePin?.(activeNote.id)} title={activeNote.isPinned ? 'Unpin' : 'Pin'} onContextMenu={(e) => { e.preventDefault(); togglePinTool('note-pin'); }}><Pin size={16} strokeWidth={2} fill={activeNote.isPinned ? 'currentColor' : 'none'} /></button>)}
+                      {pinnedTools.includes('fave') && (<button className={`inline-tool-btn${activeNote.isFavorite ? ' active' : ''}`} data-tool="fave" onClick={() => onToggleFavorite?.(activeNote.id)} title={activeNote.isFavorite ? 'Unfavorite' : 'Favorite'} onContextMenu={(e) => { e.preventDefault(); togglePinTool('fave'); }}><Star size={16} strokeWidth={2} fill={activeNote.isFavorite ? 'currentColor' : 'none'} /></button>)}
+                      {!pinnedTools.includes('fave') && (<button className={`inline-tool-btn${activeNote.isFavorite ? ' active' : ''}`} data-tool="fave" onClick={() => onToggleFavorite?.(activeNote.id)} title={activeNote.isFavorite ? 'Unfavorite' : 'Favorite'} onContextMenu={(e) => { e.preventDefault(); togglePinTool('fave'); }}><Star size={16} strokeWidth={2} fill={activeNote.isFavorite ? 'currentColor' : 'none'} /></button>)}
+                      {pinnedTools.includes('archive') && (<button className="inline-tool-btn" data-tool="archive" onClick={() => onToggleArchive?.(activeNote.id)} title={activeNote.isArchived ? 'Unarchive' : 'Archive'} onContextMenu={(e) => { e.preventDefault(); togglePinTool('archive'); }}><Archive size={16} strokeWidth={2} /></button>)}
+                      {!pinnedTools.includes('archive') && (<button className="inline-tool-btn" data-tool="archive" onClick={() => onToggleArchive?.(activeNote.id)} title={activeNote.isArchived ? 'Unarchive' : 'Archive'} onContextMenu={(e) => { e.preventDefault(); togglePinTool('archive'); }}><Archive size={16} strokeWidth={2} /></button>)}
+                      {pinnedTools.includes('delete') && (<button className="inline-tool-btn" data-tool="delete" onClick={() => onDelete?.(activeNote.id)} title="Delete" onContextMenu={(e) => { e.preventDefault(); togglePinTool('delete'); }} style={{ color: '#e25c5c' }}><Trash2 size={16} strokeWidth={2} /></button>)}
+                      {!pinnedTools.includes('delete') && (<button className="inline-tool-btn" data-tool="delete" onClick={() => onDelete?.(activeNote.id)} title="Delete" onContextMenu={(e) => { e.preventDefault(); togglePinTool('delete'); }} style={{ color: '#e25c5c' }}><Trash2 size={16} strokeWidth={2} /></button>)}
+                    </>
+                  )}
+                  <span className="inline-tool-divider" />
+                  <div className="toolbar-overflow-wrap" ref={overflowRef}>
+                    <button className="inline-tool-btn" data-tool="more" onClick={() => setShowOverflow(!showOverflow)} title="More tools" onContextMenu={(e) => e.preventDefault()} style={{ opacity: showOverflow ? 1 : 0.75 }}><MoreHorizontal size={16} strokeWidth={2} /></button>
+                    {showOverflow && (
+                      <div className="toolbar-overflow-dropdown">
+                        <button className="overflow-tool-btn" data-tool="command" onClick={() => { onAppAction?.('command'); setShowOverflow(false); }} title="Commands" onContextMenu={(e) => { e.preventDefault(); togglePinTool('command'); }}><Search size={14} strokeWidth={2} /><span>Commands</span></button>
+                        <button className="overflow-tool-btn" data-tool="add" onClick={() => { onAppAction?.('add'); setShowOverflow(false); }} title="New Note" onContextMenu={(e) => { e.preventDefault(); togglePinTool('add'); }}><FilePlus size={14} strokeWidth={2} /><span>New Note</span></button>
+                        <div className="overflow-divider" />
+                        <button className="overflow-tool-btn" data-tool="exportPDF" onClick={() => { onAppAction?.('exportPDF'); setShowOverflow(false); }} title="Print" onContextMenu={(e) => { e.preventDefault(); togglePinTool('exportPDF'); }}><Printer size={14} strokeWidth={2} /><span>Print</span></button>
+                        <button className="overflow-tool-btn" data-tool="exportJSON" onClick={() => { onAppAction?.('exportJSON'); setShowOverflow(false); }} title="Export JSON" onContextMenu={(e) => { e.preventDefault(); togglePinTool('exportJSON'); }}><Download size={14} strokeWidth={2} /><span>Export JSON</span></button>
+                        <button className="overflow-tool-btn" data-tool="share" onClick={() => { handleShare(); setShowOverflow(false); }} title="Share Note" onContextMenu={(e) => { e.preventDefault(); togglePinTool('share'); }}><Share2 size={14} strokeWidth={2} /><span>Share</span></button>
+                        <button className="overflow-tool-btn" data-tool="graph" onClick={() => { onAppAction?.('graph'); setShowOverflow(false); }} title="Knowledge Graph" onContextMenu={(e) => { e.preventDefault(); togglePinTool('graph'); }}><GitBranch size={14} strokeWidth={2} /><span>Graph</span></button>
+                        <button className="overflow-tool-btn" data-tool="calculator" onClick={() => { onAppAction?.('calculator'); setShowOverflow(false); }} title="Calculator" onContextMenu={(e) => { e.preventDefault(); togglePinTool('calculator'); }}><CalcIcon size={14} strokeWidth={2} /><span>Calculator</span></button>
+                        <button className="overflow-tool-btn" data-tool="drawing" onClick={() => { onAppAction?.('drawing'); setShowOverflow(false); }} title="Drawing Pad" onContextMenu={(e) => { e.preventDefault(); togglePinTool('drawing'); }}><Pencil size={14} strokeWidth={2} /><span>Drawing</span></button>
+                        <button className="overflow-tool-btn" data-tool="lock" onClick={() => { onAppAction?.('lock'); setShowOverflow(false); }} title="Lock Note" onContextMenu={(e) => { e.preventDefault(); togglePinTool('lock'); }}><Lock size={14} strokeWidth={2} /><span>Lock</span></button>
+                        <div className="overflow-divider" />
+                        <button className="overflow-tool-btn" data-tool="favorites" onClick={() => { onAppAction?.('favorites'); setShowOverflow(false); }} title="Favorites" onContextMenu={(e) => { e.preventDefault(); togglePinTool('favorites'); }}><Star size={14} strokeWidth={2} /><span>Favorites</span></button>
+                        <button className="overflow-tool-btn" data-tool="trash" onClick={() => { onAppAction?.('trash'); setShowOverflow(false); }} title="Trash" onContextMenu={(e) => { e.preventDefault(); togglePinTool('trash'); }}><Trash2 size={14} strokeWidth={2} /><span>Trash</span></button>
+                        <button className="overflow-tool-btn" data-tool="qrcode" onClick={() => { onAppAction?.('qrcode'); setShowOverflow(false); }} title="QR Code" onContextMenu={(e) => { e.preventDefault(); togglePinTool('qrcode'); }}><QrCode size={14} strokeWidth={2} /><span>QR Code</span></button>
+                        <button className="overflow-tool-btn" data-tool="layout" onClick={() => { onAppAction?.('layout'); setShowOverflow(false); }} title="Layout" onContextMenu={(e) => { e.preventDefault(); togglePinTool('layout'); }}><Layout size={14} strokeWidth={2} /><span>Layout</span></button>
+                        <button className="overflow-tool-btn" data-tool="security" onClick={() => { onAppAction?.('security'); setShowOverflow(false); }} title="Security" onContextMenu={(e) => { e.preventDefault(); togglePinTool('security'); }}><Shield size={14} strokeWidth={2} /><span>Security</span></button>
+                        <button className="overflow-tool-btn" data-tool="automation" onClick={() => { onAppAction?.('automation'); setShowOverflow(false); }} title="Automation" onContextMenu={(e) => { e.preventDefault(); togglePinTool('automation'); }}><Zap size={14} strokeWidth={2} /><span>Automation</span></button>
+                        <div className="overflow-divider" />
+                        <button className="overflow-tool-btn" data-tool="refresh" onClick={() => { handleMindRefresh(); setShowOverflow(false); }} title="Mind Refresh" onContextMenu={(e) => { e.preventDefault(); togglePinTool('refresh'); }}><RotateCcw size={14} strokeWidth={2} /><span>Refresh</span></button>
+                        <button className="overflow-tool-btn" data-tool="settings" onClick={() => { onAppAction?.('settings'); setShowOverflow(false); }} title="Settings" onContextMenu={(e) => { e.preventDefault(); togglePinTool('settings'); }}><Cog size={14} strokeWidth={2} /><span>Settings</span></button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
             <div 
               className={`note digital-paper paper-${paperType} size-${canvasSize.toLowerCase()}`}
               style={{
@@ -860,12 +973,18 @@ const NoteEditor = ({
             >
               <PaperBackground paperType={paperType} canvasSize={canvasSize} />
               
-              <div 
-                ref={editorRef}
-                contentEditable
-                suppressContentEditableWarning
-                onBlur={() => { handleBlur(); setIsEditorFocused(false); }}
-                onFocus={() => setIsEditorFocused(true)}
+                <div 
+                  ref={editorRef}
+                  contentEditable
+                  suppressContentEditableWarning
+                  onBlur={() => { handleBlur(); setIsEditorFocused(false); }}
+                  onFocus={() => setIsEditorFocused(true)}
+                  onPaste={(e) => {
+                    e.preventDefault();
+                    const text = (e.clipboardData || window.clipboardData).getData('text/plain');
+                    const clean = text.replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim();
+                    document.execCommand('insertText', false, clean);
+                  }}
                 onInput={() => {
                   const html = editorRef.current.innerHTML;
                   const text = editorRef.current.innerText;

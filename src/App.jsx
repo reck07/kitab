@@ -5,11 +5,10 @@ import Navbar from './Navbar'
 import Login from './Login'
 import NoteCard from './NoteCard'
 import NoteEditor from './NoteEditor'
-import { Star, Archive, X, Palette, Layout, Shield, QrCode, Zap, Trash2, Share2, Save, FilePlus, Search } from 'lucide-react'
+import { Star, Archive, X, Layout, Shield, QrCode, Zap, Trash2, Save, FilePlus, Search, Plus, Sun, Printer, Download, Lock, Calculator as CalcIcon, Pencil, GitBranch, Bold, Italic, Heading1, Heading2, List, MessageSquare, Image as ImageIcon, Mic, Smile, Sparkles, Palette } from 'lucide-react'
 import { isNoteLocked } from './crypto'
 import Calculator from './Calculator'
 import DrawingPad from './DrawingPad'
-import FloatingMenu from './FloatingMenu'
 import SettingsPanel from './SettingsPanel'
 import LayoutPanel from './LayoutPanel'
 import SecurityPanel from './SecurityPanel'
@@ -185,6 +184,17 @@ function App() {
   const [showAutomation, setShowAutomation] = useState(false);
   const [focusMode, setFocusMode] = useState(false);
   const [offline, setOffline] = useState(!navigator.onLine);
+  const [pinnedTools, setPinnedTools] = useState(() => {
+    try { return JSON.parse(localStorage.getItem('kitab_pinned_tools')) || ['bold', 'italic', 'h1', 'list', 'undo', 'redo']; }
+    catch { return ['bold', 'italic', 'h1', 'list', 'undo', 'redo']; }
+  });
+  const togglePinTool = (tool) => {
+    setPinnedTools(prev => {
+      const next = prev.includes(tool) ? prev.filter(t => t !== tool) : [...prev, tool];
+      localStorage.setItem('kitab_pinned_tools', JSON.stringify(next));
+      return next;
+    });
+  };
   const editorActionsRef = useRef(null);
   const [isSortDropdownVisible, setIsSortDropdownVisible] = useState(false);
   const [isTemplatePickerOpen, setIsTemplatePickerOpen] = useState(false);
@@ -195,7 +205,10 @@ function App() {
   const driveTokenRef = useRef(null);
   const driveFolderRef = useRef(null);
   const [showCommandPalette, setShowCommandPalette] = useState(false);
+  const [showToolSearch, setShowToolSearch] = useState(false);
+  const toolSearchRef = useRef(null);
   const [saveState, setSaveState] = useState('idle'); // idle | saving | saved-local | saved-drive
+
 
   // Load cached drive folder id
   useEffect(() => {
@@ -279,7 +292,24 @@ function App() {
     return { charCount: text.length, wordCount: text ? text.split(/\s+/).length : 0 };
   }, [activeNoteForEditor]);
 
-  const exportPDF = () => { if (activeNoteForEditor) window.print(); };
+  const exportPDF = () => {
+    const note = activeNoteForEditor;
+    if (!note) return;
+    const text = note.content ? note.content.replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim() : '';
+    if (!text) return;
+    const title = note.title || 'note';
+    const date = new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' });
+    const content = `${title}\n${date}\n${'-'.repeat(40)}\n\n${text}`;
+    const blob = new Blob([content], { type: 'text/plain' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `${title.replace(/\s+/g, '_')}.txt`;
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    URL.revokeObjectURL(url);
+  };
 
   const exportJSON = () => {
     const dataStr = JSON.stringify(notes, null, 2);
@@ -434,6 +464,17 @@ function App() {
     }
   };
 
+  // Close tool search dropdown on click outside
+  useEffect(() => {
+    const handleClick = (e) => {
+      if (toolSearchRef.current && !toolSearchRef.current.contains(e.target)) {
+        setShowToolSearch(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClick);
+    return () => document.removeEventListener('mousedown', handleClick);
+  }, []);
+
   // Watch driveSyncStatus to update saveState
   useEffect(() => {
     if (driveSyncStatus === 'synced') {
@@ -454,6 +495,38 @@ function App() {
     }
     setActiveNoteId(id);
     if (isMobile) { setIsEditorOpen(true); setIsSidebarOpen(false); }
+  };
+
+  const handleToolAction = (toolId) => {
+    switch (toolId) {
+      case 'command': setShowCommandPalette(true); break;
+      case 'favorites': setShowFavorites(p => !p); break;
+      case 'theme': handleThemeChange(theme === 'light' ? 'coffee' : 'light'); break;
+      case 'theme-coffee': handleThemeChange('coffee'); break;
+      case 'theme-dark': handleThemeChange('dark'); break;
+      case 'theme-light': handleThemeChange('light'); break;
+      case 'theme-sepia': handleThemeChange('sepia'); break;
+      case 'theme-forest': handleThemeChange('forest'); break;
+      case 'theme-ocean': handleThemeChange('ocean'); break;
+      case 'theme-sunset': handleThemeChange('sunset'); break;
+      case 'theme-monochrome': handleThemeChange('monochrome'); break;
+      case 'theme-paper': handleThemeChange('paper'); break;
+      case 'theme-highContrast': handleThemeChange('highContrast'); break;
+      case 'drive': handleGoogleDriveSave(); break;
+      case 'graph': setShowGraph(p => !p); break;
+      case 'print': exportPDF(); break;
+      case 'export': exportJSON(); break;
+      case 'lock': if (activeNoteForEditor) handleLockToggle(activeNoteForEditor.id); break;
+      case 'calculator': setShowCalculator(true); break;
+      case 'drawing': setShowDrawingPad(true); break;
+      case 'archive': setShowArchived(p => !p); break;
+      case 'trash': setShowTrash(p => !p); break;
+      case 'qrcode': setShowQrCode(true); break;
+      case 'layout': setShowLayoutPanel(true); break;
+      case 'security': setShowSecurityPanel(true); break;
+      case 'automation': setShowAutomation(true); break;
+      case 'settings': setShowSettings(true); break;
+    }
   };
 
   const handleFabAction = useCallback((action) => {
@@ -479,6 +552,80 @@ function App() {
       case 'add': addPage(); break;
     }
   }, [activeNoteId, addPage, exportJSON, exportPDF, handleSummarize]);
+
+  const handleSidebarAction = useCallback((action) => {
+    if (['bold', 'italic', 'h1', 'h2', 'list', 'quote', 'voice', 'image', 'paper', 'size', 'ai', 'emoji', 'grammar', 'exportJSON', 'exportPDF', 'graph', 'drawing', 'calculator', 'add'].includes(action)) {
+      handleFabAction(action);
+    } else {
+      handleToolAction(action);
+    }
+  }, [handleFabAction, handleToolAction]);
+
+  const toolGroups = [
+    {
+      id: 'format',
+      label: 'Format',
+      tools: [
+        { icon: Bold, action: 'bold', label: 'Bold' },
+        { icon: Italic, action: 'italic', label: 'Italic' },
+        { icon: Heading1, action: 'h1', label: 'H1' },
+        { icon: Heading2, action: 'h2', label: 'H2' },
+        { icon: List, action: 'list', label: 'List' },
+        { icon: MessageSquare, action: 'quote', label: 'Quote' },
+      ]
+    },
+    {
+      id: 'insert',
+      label: 'Insert',
+      tools: [
+        { icon: ImageIcon, action: 'image', label: 'Image' },
+        { icon: Mic, action: 'voice', label: 'Voice' },
+        { icon: Smile, action: 'emoji', label: 'Emoji' },
+        { icon: Sparkles, action: 'grammar', label: 'Grammar' },
+      ]
+    },
+    {
+      id: 'actions',
+      label: 'Actions',
+      tools: [
+        { icon: Plus, action: 'add', label: 'New' },
+        { icon: Download, action: 'exportPDF', label: 'TXT' },
+        { icon: GitBranch, action: 'graph', label: 'Graph' },
+        { icon: CalcIcon, action: 'calculator', label: 'Calc' },
+        { icon: Pencil, action: 'drawing', label: 'Draw' },
+        { icon: Lock, action: 'lock', label: 'Lock' },
+      ]
+    },
+    {
+      id: 'themes',
+      label: 'Themes',
+      tools: [
+        { icon: Palette, action: 'theme-coffee', label: 'Coffee' },
+        { icon: Palette, action: 'theme-dark', label: 'Dark' },
+        { icon: Palette, action: 'theme-light', label: 'Light' },
+        { icon: Palette, action: 'theme-sepia', label: 'Sepia' },
+        { icon: Palette, action: 'theme-forest', label: 'Forest' },
+        { icon: Palette, action: 'theme-ocean', label: 'Ocean' },
+        { icon: Palette, action: 'theme-sunset', label: 'Sunset' },
+        { icon: Palette, action: 'theme-monochrome', label: 'Monochrome' },
+        { icon: Palette, action: 'theme-paper', label: 'Paper White' },
+        { icon: Palette, action: 'theme-highContrast', label: 'High Contrast' },
+      ]
+    },
+    {
+      id: 'manage',
+      label: 'Manage',
+      tools: [
+        { icon: Star, action: 'favorites', label: 'Favs' },
+        { icon: Archive, action: 'archive', label: 'Archive' },
+        { icon: Trash2, action: 'trash', label: 'Trash' },
+        { icon: QrCode, action: 'qrcode', label: 'QR' },
+        { icon: Layout, action: 'layout', label: 'Layout' },
+        { icon: Shield, action: 'security', label: 'Security' },
+        { icon: Zap, action: 'automation', label: 'Auto' },
+      ]
+    }
+  ];
 
   const showSidebar = isSidebarOpen && !focusMode;
   const showEditor = isMobile ? isEditorOpen : true;
@@ -511,10 +658,10 @@ function App() {
             onSignOut={handleSignOut}
             isGuest={isGuest}
             onLogin={clearGuestMode}
-            onGoogleDriveSave={handleGoogleDriveSave}
-            driveSyncStatus={driveSyncStatus}
-            onToggleView={() => setShowViewSwitcher(!showViewSwitcher)}
+            onExport={exportPDF}
+            onToggleView={() => { setShowViewSwitcher(!showViewSwitcher); setIsSidebarOpen(true); if (isMobile) setIsEditorOpen(false); }}
             onNewNote={addPage}
+            onBrandClick={() => { setIsSidebarOpen(true); if (isMobile) setIsEditorOpen(false); }}
           />
 
           {showViewSwitcher && (
@@ -557,11 +704,28 @@ function App() {
           <div className={`app-body ${isSidebarOpen ? 'sidebar-open' : ''} ${isEditorOpen ? 'editor-open' : ''}`} style={{ position: 'relative', display: 'flex', width: '100%', overflow: 'hidden' }}>
             <aside className={`sidebar ${showSidebar ? 'open' : ''}`} style={isMobile && showSidebar ? { position: 'absolute', zIndex: 1000, top: 0, bottom: 0, left: 0, width: '85%', maxWidth: '350px', backgroundColor: 'var(--bg-app)', boxShadow: '4px 0 24px rgba(0,0,0,0.5)' } : {}}>
               <div className="sidebar-controls">
-                <div className="search-sort-wrapper" onFocus={() => setIsSortDropdownVisible(true)} tabIndex={-1} onBlur={() => setTimeout(() => setIsSortDropdownVisible(false), 150)}>
+                <div className="search-sort-wrapper" ref={toolSearchRef} tabIndex={-1}>
                   <div className="search-group">
                     <svg className="search-icon" aria-hidden="true" viewBox="0 0 24 24"><g><path d="M21.53 20.47l-3.66-3.66C19.195 15.24 20 13.214 20 11c0-4.97-4.03-9-9-9s-9 4.03-9 9 4.03 9 9 9c2.215 0 4.24-.804 5.808-2.13l3.66 3.66c.147.146.34.22.53.22s.385-.073.53-.22c.295-.293.295-.767.002-1.06zM3.5 11c0-4.135 3.365-7.5 7.5-7.5s7.5 3.365 7.5 7.5-3.365 7.5-7.5 7.5-7.5-3.365-7.5-7.5z"></path></g></svg>
-                    <input type="text" placeholder="Search notes or #tag... (Ctrl+K)" onChange={(e) => { if (debounceRef.current) clearTimeout(debounceRef.current); debounceRef.current = setTimeout(() => setSearchQuery(e.target.value), 200); }} className="search-input" />
+                    <input type="text" placeholder="Search notes or #tag... (Ctrl+K)" onChange={(e) => { if (debounceRef.current) clearTimeout(debounceRef.current); debounceRef.current = setTimeout(() => setSearchQuery(e.target.value), 200); }} className="search-input" onClick={() => setShowToolSearch(true)} />
                   </div>
+                  {showToolSearch && (
+                    <div className="tool-search-dropdown">
+                      <div className="dropdown-divider"></div>
+                      <div className="dropdown-results-list">
+                        {toolGroups.flatMap(group => group.tools).filter(tool => !['bold','italic','h1','h2','list','quote','image','voice','grammar','emoji'].includes(tool.action)).filter(tool => !searchQuery || tool.label.toLowerCase().includes(searchQuery.toLowerCase())).map(tool => (
+                          <div key={tool.action} className="result-item" onClick={() => { handleSidebarAction(tool.action); setShowToolSearch(false); }}>
+                            <span className="item-icon"><tool.icon size={14} /></span>
+                            <div className="item-meta">
+                              <span className="item-name">{tool.label}</span>
+                              <span className="item-desc">{tool.label}</span>
+                            </div>
+                            <button className={`pin-toggle-btn${pinnedTools.includes(tool.action) ? ' active' : ''}`} title={pinnedTools.includes(tool.action) ? 'Unpin from toolbar' : 'Pin to toolbar'} onClick={(e) => { e.stopPropagation(); togglePinTool(tool.action); }}>📌</button>
+                          </div>
+                        ))}
+                      </div>
+                    </div>
+                  )}
                   <div className={`sort-dropdown ${isSortDropdownVisible ? 'visible' : ''}`}>
                     <div className="radio-inputs">
                       <label className="radio"><input type="radio" name="sort" value="latest" checked={sortOrder === 'latest'} onChange={(e) => setSortOrder(e.target.value)} /><span className="name">Latest</span></label>
@@ -569,18 +733,6 @@ function App() {
                       <label className="radio"><input type="radio" name="sort" value="manual" checked={sortOrder === 'manual'} onChange={(e) => setSortOrder(e.target.value)} /><span className="name">Manual (drag)</span></label>
                     </div>
                   </div>
-                </div>
-                <div className="hex-controls">
-                  <button className="btn-hexagon" onClick={() => setShowCommandPalette(true)} title="Command Palette (Ctrl+K)"><Search size={16} /></button>
-                  <button className={`btn-hexagon ${showFavorites ? 'active' : ''}`} onClick={() => setShowFavorites(!showFavorites)} title="Show Favorites"><Star size={16} fill={showFavorites ? 'currentColor' : 'none'} /></button>
-                  <button className="btn-hexagon" onClick={() => setShowSettings(true)} title="Theme Settings"><Palette size={16} /></button>
-                  <button className="btn-hexagon" onClick={() => setShowQrCode(true)} title="Share via QR Code"><QrCode size={16} /></button>
-                  <button className={`btn-hexagon ${showArchived ? 'active' : ''}`} onClick={() => setShowArchived(!showArchived)} title="Show Archived"><Archive size={16} fill={showArchived ? 'currentColor' : 'none'} /></button>
-                  <button className={`btn-hexagon ${showTrash ? 'active' : ''}`} onClick={() => setShowTrash(!showTrash)} title="Recycle Bin"><Trash2 size={16} fill={showTrash ? 'currentColor' : 'none'} /></button>
-                  <button className="btn-hexagon" onClick={() => setShowLayoutPanel(true)} title="Layout Settings"><Layout size={16} /></button>
-                  <button className="btn-hexagon" onClick={() => setShowSecurityPanel(true)} title="Security Settings"><Shield size={16} /></button>
-                  <button className="btn-hexagon" onClick={() => setShowAutomation(true)} title="Automation Rules"><Zap size={16} /></button>
-                  <button className={`btn-hexagon ${showGraph ? 'active' : ''}`} onClick={() => setShowGraph(!showGraph)} title="Knowledge Graph"><Share2 size={16} /></button>
                 </div>
               </div>
               <div className="note-list" data-view={viewMode}>
@@ -623,6 +775,7 @@ function App() {
                   onThemeChange={() => handleThemeChange(theme === 'light' ? 'coffee' : 'light')}
                   theme={theme}
                   allTags={allTags}
+                  onAppAction={handleSidebarAction}
                 />
               ) : (
                 <div className="empty-state" style={{ background: 'var(--bg-card)', margin: '24px', borderRadius: 'var(--radius)', boxShadow: 'var(--shadow)', textAlign: 'center' }}>
@@ -668,8 +821,6 @@ function App() {
             {saveState === 'saved-local' && `Saved at ${lastSavedTime} ✓`}
             {saveState === 'saved-drive' && 'Saved to Drive ✓'}
           </div>
-
-          <FloatingMenu onAction={handleFabAction} />
 
           {showCommandPalette && <CommandPalette onClose={handlePaletteAction} />}
 
