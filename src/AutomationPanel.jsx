@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { X, Plus, Trash2, ToggleLeft, ToggleRight } from 'lucide-react';
 import { getRules, saveRules, removeRule, addRule } from './automationRules';
 
@@ -9,11 +9,9 @@ const TRIGGERS = [
 ];
 
 const AutomationPanel = ({ onClose }) => {
-  const [rules, setRules] = useState([]);
+  const [rules, setRules] = useState(() => getRules());
   const [showAdd, setShowAdd] = useState(false);
   const [form, setForm] = useState({ trigger: 'onCreate', conditionTag: '', conditionFolder: '', conditionContent: '', actionAddTag: '', actionRemoveTag: '', actionArchive: false, actionPin: false });
-
-  useEffect(() => { setRules(getRules()); }, []);
 
   const handleAdd = () => {
     if (!form.actionAddTag && !form.actionRemoveTag && !form.actionArchive && !form.actionPin) return;

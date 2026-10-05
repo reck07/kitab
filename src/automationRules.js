@@ -27,7 +27,7 @@ export function removeRule(id) {
   return rules;
 }
 
-export function evaluateRules(note, trigger, notes = []) {
+export function evaluateRules(note, trigger) {
   const rules = getRules().filter(r => r.enabled && r.trigger === trigger);
   const actions = [];
 

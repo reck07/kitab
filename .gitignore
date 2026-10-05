@@ -1,18 +1,14 @@
-# Logs
-logs
-*.log
-npm-debug.log*
-yarn-debug.log*
-yarn-error.log*
-pnpm-debug.log*
-lerna-debug.log*
-
 node_modules
 dist
 dist-ssr
 *.local
 
-# Editor directories and files
+# Environment
+.env
+.env.*
+!.env.example
+
+# Editor
 .vscode/*
 !.vscode/extensions.json
 .idea
@@ -22,4 +18,25 @@ dist-ssr
 *.njsproj
 *.sln
 *.sw?
-.env
+
+# Logs
+logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
+# Android / build output
+android/app/build
+android/build
+android/.gradle
+android/local.properties
+android/app/src/main/assets/public
+*.apk
+*.aab
+*.keystore
+!android/app/google-services.json
+
+# Release APKs are intentionally tracked in the repo root for download links
+!Kitab-*.apk

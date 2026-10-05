@@ -1,3 +1,4 @@
+/* global google */
 import { useState, useEffect, useRef, useMemo, useCallback } from 'react'
 import { supabase } from './supabaseClient'
 import './App.css'
@@ -5,7 +6,7 @@ import Navbar from './Navbar'
 import Login from './Login'
 import NoteCard from './NoteCard'
 import NoteEditor from './NoteEditor'
-import { Star, Archive, X, Layout, Shield, QrCode, Zap, Trash2, Save, FilePlus, Search, Plus, Sun, Printer, Download, Lock, Calculator as CalcIcon, Pencil, GitBranch, Bold, Italic, Heading1, Heading2, List, MessageSquare, Image as ImageIcon, Mic, Smile, Sparkles, Palette, Share2 } from 'lucide-react'
+import { Star, Archive, X, Layout, Shield, QrCode, Zap, Trash2, Save, FilePlus, Plus, Download, Lock, Calculator as CalcIcon, Pencil, GitBranch, Bold, Italic, Heading1, Heading2, List, MessageSquare, Image as ImageIcon, Mic, Smile, Sparkles, Palette, Share2 } from 'lucide-react'
 import { isNoteLocked } from './crypto'
 import Calculator from './Calculator'
 import DrawingPad from './DrawingPad'
@@ -14,8 +15,7 @@ import LayoutPanel from './LayoutPanel'
 import SecurityPanel from './SecurityPanel'
 import QrCodeModal from './QrCodeModal'
 import AutomationPanel from './AutomationPanel'
-import { evaluateRules, applyActions } from './automationRules'
-import { DEFAULT_NOTE_CONFIG, THEME_PRESETS } from './paperTypes'
+import { THEME_PRESETS } from './paperTypes'
 import { useAuth } from './hooks/useAuth'
 import { useNotes } from './hooks/useNotes'
 import CommandPalette from './CommandPalette'
@@ -68,7 +68,6 @@ const GraphView = ({ notes, unlockedContentById, activeNoteId, onNavigate, onClo
   const groupKeys = Object.keys(tagGroups);
   const nodePositions = {};
   const cx = width / 2; const cy = height / 2;
-  const ringRadius = 200;
 
   groupKeys.forEach((groupKey, gIdx) => {
     const groupNodes = tagGroups[groupKey];
@@ -110,7 +109,7 @@ const GraphView = ({ notes, unlockedContentById, activeNoteId, onNavigate, onClo
   const handleMouseUp = () => { dragRef.current = null; };
 
   return (
-    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 999, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(4px)' }} onClick={onClose}>
+    <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 2100, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(4px)' }} onClick={onClose}>
       <div onClick={e => e.stopPropagation()} style={{ background: 'var(--bg-app)', borderRadius: 'var(--radius)', padding: '24px', width: '90%', maxWidth: '850px', boxShadow: 'var(--shadow)', border: '1px solid var(--border)' }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px', alignItems: 'center' }}>
           <h3 style={{ margin: 0 }}>Knowledge Graph <span style={{ fontSize: 12, color: 'var(--text-muted)', fontWeight: 400 }}>scroll to zoom · drag to pan · click a node to navigate</span></h3>
@@ -139,7 +138,7 @@ const GraphView = ({ notes, unlockedContentById, activeNoteId, onNavigate, onClo
         </div>
         <div style={{ marginTop: 12, fontSize: 12, color: 'var(--text-muted)', display: 'flex', gap: 16, justifyContent: 'center' }}>
           <span><span style={{ display: 'inline-block', width: 12, height: 2, background: 'var(--text-muted)', opacity: 0.4, marginRight: 4, verticalAlign: 'middle' }} /> Explicit link (wikilink)</span>
-          <span><span style={{ display: 'inline-block', width: 12, height: 2, background: 'var(--text-muted)', opacity: 0.2, marginRight: 4, verticalAlign: 'middle', borderTop: '2px dashed var(--text-muted)', background: 'none' }} /> Implicit link (shared tag)</span>
+          <span><span style={{ display: 'inline-block', width: 12, height: 2, background: 'none', opacity: 0.2, marginRight: 4, verticalAlign: 'middle', borderTop: '2px dashed var(--text-muted)' }} /> Implicit link (shared tag)</span>
         </div>
       </div>
     </div>
@@ -149,18 +148,17 @@ const GraphView = ({ notes, unlockedContentById, activeNoteId, onNavigate, onClo
 function App() {
   const { user, authLoading, isGuest, isAuthenticated, handleSignOut, handleSkipLogin, clearGuestMode } = useAuth();
   const {
-    notes, activeNoteId, setActiveNoteId, activeNote, activeNoteForEditor,
-    unlockedContentById, showArchived, setShowArchived, showTrash, setShowTrash,
-    searchQuery, setSearchQuery, selectedTag, setSelectedTag, selectedFolder, setSelectedFolder,
-    showFavorites, setShowFavorites, sortOrder, setSortOrder,
-    showSavedIndicator, lastSavedTime,
-    filteredNotes, allTags, allFolders, forwardLinks, backlinks,
+    notes, activeNoteId, setActiveNoteId, activeNoteForEditor,
+    unlockedContentById, setShowArchived, showTrash, setShowTrash,
+    searchQuery, setSearchQuery,
+    setShowFavorites, sortOrder, setSortOrder,
+    lastSavedTime,
+    filteredNotes, forwardLinks, backlinks,
     addPage, removePage, restoreNote, permanentlyDelete,
     handleTogglePin, handleToggleFavorite, handleToggleArchive,
     handleLockToggle, handleSecurityLock, handleSecurityUnlock,
-    handleEditorUpdate, handleRemoveTag, unlockNote,
+    handleEditorUpdate, unlockNote,
     reorderNotes, saveAsTemplate, loadTemplates, createFromTemplate,
-    setNotes,
   } = useNotes(user);
 
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768);
@@ -168,9 +166,11 @@ function App() {
   const [isEditorOpen, setIsEditorOpen] = useState(window.innerWidth >= 768);
   const notesRef = useRef(notes);
   const activeNoteIdRef = useRef(activeNoteId);
-  notesRef.current = notes;
-  activeNoteIdRef.current = activeNoteId;
   const debounceRef = useRef(null);
+
+  // Keep refs in sync without mutating during render
+  useEffect(() => { notesRef.current = notes; }, [notes]);
+  useEffect(() => { activeNoteIdRef.current = activeNoteId; }, [activeNoteId]);
   const [theme, setTheme] = useState(() => localStorage.getItem('theme') || 'coffee');
   const [showGraph, setShowGraph] = useState(false);
   const [showCalculator, setShowCalculator] = useState(false);
@@ -200,8 +200,7 @@ function App() {
   const [isTemplatePickerOpen, setIsTemplatePickerOpen] = useState(false);
   const [dragIndex, setDragIndex] = useState(null);
   const [viewMode, setViewMode] = useState('list');
-  const [showViewSwitcher, setShowViewSwitcher] = useState(false);
-  const [driveSyncStatus, setDriveSyncStatus] = useState('idle');
+  const [showViewSwitcher, setShowViewSwitcher] = useState(true);
   const driveTokenRef = useRef(null);
   const driveFolderRef = useRef(null);
   const [showCommandPalette, setShowCommandPalette] = useState(false);
@@ -292,7 +291,7 @@ function App() {
     return { charCount: text.length, wordCount: text ? text.split(/\s+/).length : 0 };
   }, [activeNoteForEditor]);
 
-  const exportPDF = () => {
+  const exportPDF = useCallback(() => {
     const note = activeNoteForEditor;
     if (!note) return;
     const text = note.content ? note.content.replace(/<[^>]+>/g, '').replace(/&nbsp;/g, ' ').replace(/\s+/g, ' ').trim() : '';
@@ -309,9 +308,9 @@ function App() {
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
-  };
+  }, [activeNoteForEditor]);
 
-  const exportJSON = () => {
+  const exportJSON = useCallback(() => {
     const dataStr = JSON.stringify(notes, null, 2);
     const dataBlob = new Blob([dataStr], { type: 'application/json' });
     const url = URL.createObjectURL(dataBlob);
@@ -322,7 +321,7 @@ function App() {
     link.click();
     document.body.removeChild(link);
     URL.revokeObjectURL(url);
-  };
+  }, [notes]);
 
   const handlePaletteAction = (action) => {
     setShowCommandPalette(false);
@@ -346,7 +345,7 @@ function App() {
     }
   };
 
-  const handleSummarize = async (id, format = 'summary', customPrompt = null) => {
+  const handleSummarize = useCallback(async (id, format = 'summary', customPrompt = null) => {
     const note = notes.find(n => n.id === id);
     if (!note) return;
     if (!supabase) { alert('Connect Supabase first to use AI summary.'); return; }
@@ -360,30 +359,42 @@ function App() {
         handleEditorUpdate(id, { content: textToSummarize + `<br><br><b>${aiLabel}:</b><br> ${data.result || data.summary}` });
       } else if (error) { alert('Unable to summarize note right now.'); }
     } catch { alert('AI summary requires Supabase edge functions to be configured.'); }
-  };
+  }, [notes, unlockedContentById, handleEditorUpdate]);
 
-  const getDriveToken = async () => {
+const getDriveToken = useCallback(async () => {
     if (driveTokenRef.current) return driveTokenRef.current;
-    const loadGIS = () => new Promise((resolve) => {
-      if (window.google?.accounts?.oauth2) { resolve(); return; }
-      const s = document.createElement('script');
-      s.src = 'https://accounts.google.com/gsi/client';
-      s.onload = resolve;
-      document.head.appendChild(s);
-    });
+    // GIS script is now loaded via index.html
+    if (!window.google?.accounts?.oauth2) {
+      // Wait a bit for the async script to load
+      await new Promise(r => setTimeout(r, 500));
+      if (!window.google?.accounts?.oauth2) {
+        alert('Google Identity Services failed to load. Check your network or ad blocker.');
+        return null;
+      }
+    }
     let clientId = localStorage.getItem('google_client_id');
     if (!clientId) {
       clientId = prompt('Enter your Google OAuth Client ID to enable Drive sync:');
       if (!clientId) return null;
       localStorage.setItem('google_client_id', clientId);
     }
-    await loadGIS();
     return new Promise((resolve) => {
       const tc = google.accounts.oauth2.initTokenClient({
         client_id: clientId,
         scope: 'https://www.googleapis.com/auth/drive.file',
         callback: (resp) => {
-          if (resp.error) { resolve(null); return; }
+          if (resp.error) {
+            // Surface the real reason instead of failing silently.
+            const detail = resp.error_description
+              ? `${resp.error}: ${resp.error_description}`
+              : resp.error;
+            alert(`Google Drive sign-in failed\n\n${detail}\n\n`
+              + 'Check the OAuth client ID and its type in Google Cloud Console '
+              + '(APIs & Services → Credentials), and make sure the Drive API is enabled.');
+            localStorage.removeItem('google_client_id');
+            resolve(null);
+            return;
+          }
           driveTokenRef.current = resp.access_token;
           setTimeout(() => { driveTokenRef.current = null; }, 300000);
           resolve(resp.access_token);
@@ -391,9 +402,9 @@ function App() {
       });
       tc.requestAccessToken();
     });
-  };
+  }, []);
 
-  const ensureDriveFolder = async (token) => {
+  const ensureDriveFolder = useCallback(async (token) => {
     if (driveFolderRef.current) return driveFolderRef.current;
     const list = await fetch(`https://www.googleapis.com/drive/v3/files?q=name='kitāb' and mimeType='application/vnd.google-apps.folder' and trashed=false&fields=files(id)`, {
       headers: { Authorization: `Bearer ${token}` },
@@ -413,9 +424,9 @@ function App() {
     driveFolderRef.current = folder.id;
     localStorage.setItem('kitab_drive_folder_id', folder.id);
     return folder.id;
-  };
+  }, []);
 
-  const uploadNoteToDrive = async (note, token, folderId) => {
+  const uploadNoteToDrive = useCallback(async (note, token, folderId) => {
     const content = `# ${note.title}\n\n${note.content?.replace(/<[^>]*>/g, '') || ''}`;
     const metadata = { name: `${note.title || 'untitled'}.md`, mimeType: 'text/markdown', parents: [folderId] };
     const form = new FormData();
@@ -428,24 +439,23 @@ function App() {
     });
     if (!result.ok) { const e = await result.text(); throw new Error(e); }
     return result.json();
-  };
+  }, []);
 
-  const handleGoogleDriveSave = async (noteId) => {
+  const handleGoogleDriveSave = useCallback(async (noteId) => {
     const note = notesRef.current.find(n => n.id === (noteId || activeNoteIdRef.current));
     if (!note) return;
-    setDriveSyncStatus('syncing');
     try {
       const token = await getDriveToken();
-      if (!token) { setDriveSyncStatus('error'); return; }
+      if (!token) { setSaveState('saved-local'); return; }
       const folderId = await ensureDriveFolder(token);
       await uploadNoteToDrive(note, token, folderId);
-      setDriveSyncStatus('synced');
-      setTimeout(() => setDriveSyncStatus(prev => prev === 'synced' ? 'idle' : prev), 2000);
-    } catch (e) {
-      setDriveSyncStatus('error');
-      setTimeout(() => setDriveSyncStatus(prev => prev === 'error' ? 'idle' : prev), 3000);
+      setSaveState('saved-drive');
+      setTimeout(() => setSaveState(prev => prev === 'saved-drive' ? 'idle' : prev), 3000);
+    } catch {
+      setSaveState('saved-local');
+      setTimeout(() => setSaveState(prev => prev === 'saved-local' ? 'idle' : prev), 3000);
     }
-  };
+  }, [getDriveToken, ensureDriveFolder, uploadNoteToDrive]);
 
   // Auto-sync to Drive after local save (if Drive is authorized)
   const autoSaveTimerRef = useRef(null);
@@ -475,17 +485,6 @@ function App() {
     return () => document.removeEventListener('mousedown', handleClick);
   }, []);
 
-  // Watch driveSyncStatus to update saveState
-  useEffect(() => {
-    if (driveSyncStatus === 'synced') {
-      setSaveState('saved-drive');
-      setTimeout(() => setSaveState(prev => prev === 'saved-drive' ? 'idle' : prev), 3000);
-    } else if (driveSyncStatus === 'error') {
-      setSaveState('saved-local');
-      setTimeout(() => setSaveState(prev => prev === 'saved-local' ? 'idle' : prev), 3000);
-    }
-  }, [driveSyncStatus]);
-
   const handleNoteSelect = async (id) => {
     const note = notes.find(n => n.id === id);
     if (!note) return;
@@ -497,7 +496,7 @@ function App() {
     if (isMobile) { setIsEditorOpen(true); setIsSidebarOpen(false); }
   };
 
-  const handleToolAction = (toolId) => {
+  const handleToolAction = useCallback((toolId) => {
     switch (toolId) {
       case 'command': setShowCommandPalette(true); break;
       case 'favorites': setShowFavorites(p => !p); break;
@@ -525,6 +524,8 @@ function App() {
       case 'layout': setShowLayoutPanel(true); break;
       case 'security': setShowSecurityPanel(true); break;
       case 'automation': setShowAutomation(true); break;
+      case 'templates': setIsTemplatePickerOpen(true); break;
+      case 'saveTemplate': saveAsTemplate(); break;
       case 'settings': setShowSettings(true); break;
       case 'share':
         if (activeNoteForEditor) {
@@ -535,7 +536,7 @@ function App() {
         }
         break;
     }
-  };
+  }, [theme, activeNoteForEditor, handleLockToggle, exportPDF, exportJSON, handleGoogleDriveSave, saveAsTemplate, setShowArchived, setShowTrash, setShowQrCode, setShowLayoutPanel, setShowSecurityPanel, setShowAutomation, setShowSettings, setShowFavorites, setShowGraph, setShowCalculator, setShowDrawingPad]);
 
   const handleFabAction = useCallback((action) => {
     switch (action) {
@@ -632,6 +633,8 @@ function App() {
         { icon: Layout, action: 'layout', label: 'Layout' },
         { icon: Shield, action: 'security', label: 'Security' },
         { icon: Zap, action: 'automation', label: 'Auto' },
+        { icon: Save, action: 'saveTemplate', label: 'Save Template' },
+        { icon: FilePlus, action: 'templates', label: 'Templates' },
       ]
     }
   ];
@@ -717,6 +720,17 @@ function App() {
                   <div className="search-group">
                     <svg className="search-icon" aria-hidden="true" viewBox="0 0 24 24"><g><path d="M21.53 20.47l-3.66-3.66C19.195 15.24 20 13.214 20 11c0-4.97-4.03-9-9-9s-9 4.03-9 9 4.03 9 9 9c2.215 0 4.24-.804 5.808-2.13l3.66 3.66c.147.146.34.22.53.22s.385-.073.53-.22c.295-.293.295-.767.002-1.06zM3.5 11c0-4.135 3.365-7.5 7.5-7.5s7.5 3.365 7.5 7.5-3.365 7.5-7.5 7.5-7.5-3.365-7.5-7.5z"></path></g></svg>
                     <input type="text" placeholder="Search notes or #tag... (Ctrl+K)" onChange={(e) => { if (debounceRef.current) clearTimeout(debounceRef.current); debounceRef.current = setTimeout(() => setSearchQuery(e.target.value), 200); }} className="search-input" onClick={() => setShowToolSearch(true)} />
+                    <button
+                      className={`sort-toggle-btn${isSortDropdownVisible ? ' active' : ''}`}
+                      onClick={() => setIsSortDropdownVisible(v => !v)}
+                      aria-label="Change note sort order"
+                      aria-expanded={isSortDropdownVisible}
+                      title="Sort order"
+                    >
+                      <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+                        <path d="M3 4h10M3 8h7M3 12h4" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" />
+                      </svg>
+                    </button>
                   </div>
                   {showToolSearch && (
                     <div className="tool-search-dropdown">
@@ -767,23 +781,15 @@ function App() {
                   onTogglePin={handleTogglePin}
                   onToggleFavorite={handleToggleFavorite}
                   onToggleArchive={handleToggleArchive}
-                  onRemoveTag={handleRemoveTag}
-                  onSummarize={handleSummarize}
-                  onToggleLock={handleLockToggle}
                   charCount={charCount}
                   wordCount={wordCount}
-                  onCloseEditor={isMobile ? () => { setIsEditorOpen(false); setIsSidebarOpen(true); } : undefined}
                   forwardLinks={forwardLinks}
                   backlinks={backlinks}
                   onNavigate={handleNoteSelect}
                   editorActionsRef={editorActionsRef}
                   onToggleFocus={() => setFocusMode(p => !p)}
                   focusMode={focusMode}
-                  onSaveTemplate={saveAsTemplate}
-                  onLoadTemplate={() => setIsTemplatePickerOpen(true)}
                   onThemeChange={() => handleThemeChange(theme === 'light' ? 'coffee' : 'light')}
-                  theme={theme}
-                  allTags={allTags}
                   onAppAction={handleSidebarAction}
                   pinnedTools={pinnedTools}
                   onTogglePinTool={togglePinTool}
@@ -801,7 +807,7 @@ function App() {
           {isTemplatePickerOpen && (() => {
             const templates = loadTemplates();
             return (
-              <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 999, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(4px)' }} onClick={() => setIsTemplatePickerOpen(false)}>
+              <div style={{ position: 'fixed', inset: 0, background: 'rgba(0,0,0,0.5)', zIndex: 2100, display: 'flex', alignItems: 'center', justifyContent: 'center', backdropFilter: 'blur(4px)' }} onClick={() => setIsTemplatePickerOpen(false)}>
                 <div onClick={e => e.stopPropagation()} style={{ background: 'var(--bg-app)', borderRadius: 'var(--radius)', padding: '24px', width: '90%', maxWidth: '500px', boxShadow: 'var(--shadow)', border: '1px solid var(--border)' }}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '16px', alignItems: 'center' }}>
                     <h3 style={{ margin: 0 }}>Note Templates <Save size={16} style={{ verticalAlign: 'middle', marginLeft: 6 }} /></h3>
@@ -827,10 +833,14 @@ function App() {
             );
           })()}
 
-          <div className={`saved-indicator ${saveState !== 'idle' ? 'show' : ''}`} style={{ zIndex: 100 }}>
-            {saveState === 'saving' && 'Saving...'}
-            {saveState === 'saved-local' && `Saved at ${lastSavedTime} ✓`}
-            {saveState === 'saved-drive' && 'Saved to Drive ✓'}
+          <div
+            className={`saved-indicator ${saveState !== 'idle' || offline ? 'show' : ''}`}
+            style={{ zIndex: 100, background: offline ? 'var(--danger)' : undefined }}
+          >
+            {offline && 'Offline — changes saved locally'}
+            {!offline && saveState === 'saving' && 'Saving...'}
+            {!offline && saveState === 'saved-local' && `Saved at ${lastSavedTime} ✓`}
+            {!offline && saveState === 'saved-drive' && 'Saved to Drive ✓'}
           </div>
 
           {showCommandPalette && <CommandPalette onClose={handlePaletteAction} />}

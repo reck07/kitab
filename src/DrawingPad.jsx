@@ -7,10 +7,48 @@ const DrawingPad = ({ onClose, onSaveToNote }) => {
   const dragStart = useRef({ x: 0, y: 0 });
 
   const canvasRef = useRef(null);
+  const canvasAreaRef = useRef(null);
   const [isDrawing, setIsDrawing] = useState(false);
   const [color, setColor] = useState('#ffeb3b');
   const [thickness, setThickness] = useState(3);
   const [mode, setMode] = useState('pencil'); // 'pencil' or 'eraser'
+
+  // Resize the backing buffer whenever the widget is resized, preserving ink
+  const lastSizeRef = useRef({ w: 0, h: 0 });
+
+  useEffect(() => {
+    const area = canvasAreaRef.current;
+    const canvas = canvasRef.current;
+    if (!area || !canvas) return;
+    if (typeof ResizeObserver === 'undefined') return;
+
+    const syncSize = () => {
+      const w = Math.max(1, Math.round(area.clientWidth));
+      const h = Math.max(1, Math.round(area.clientHeight));
+      if (w === canvas.width && h === canvas.height) return;
+      const prevW = canvas.width;
+      const prevH = canvas.height;
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = Math.round(w * dpr);
+      canvas.height = Math.round(h * dpr);
+      const ctx = canvas.getContext('2d');
+      // Redraw existing strokes scaled into the new buffer
+      const snapshot = prevW && prevH ? ctx.getImageData(0, 0, prevW, prevH) : null;
+      if (snapshot) {
+        const tmp = document.createElement('canvas');
+        tmp.width = prevW;
+        tmp.height = prevH;
+        tmp.getContext('2d').putImageData(snapshot, 0, 0);
+        ctx.drawImage(tmp, 0, 0, prevW, prevH, 0, 0, canvas.width, canvas.height);
+      }
+      lastSizeRef.current = { w: canvas.width, h: canvas.height };
+    };
+
+    syncSize();
+    const observer = new ResizeObserver(syncSize);
+    observer.observe(area);
+    return () => observer.disconnect();
+  }, []);
 
   // Dragging logic
   useEffect(() => {
@@ -39,16 +77,29 @@ const DrawingPad = ({ onClose, onSaveToNote }) => {
     dragStart.current = { x: e.clientX - position.x, y: e.clientY - position.y };
   };
 
+  // Keep the canvas backing buffer matched to its displayed size. The widget is
+  // resizable (and switches to a narrower width on mobile), so a fixed buffer
+  // would overflow and clip the right-hand side beyond the pointer's reach.
+  const getCanvasPoint = (e) => {
+    const canvas = canvasRef.current;
+    const rect = canvas.getBoundingClientRect();
+    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
+    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
+    const scaleX = canvas.width / rect.width;
+    const scaleY = canvas.height / rect.height;
+    return {
+      x: (clientX - rect.left) * scaleX,
+      y: (clientY - rect.top) * scaleY,
+    };
+  };
+
   // Canvas Drawing logic
   const startDrawing = (e) => {
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
-    const rect = canvas.getBoundingClientRect();
-    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-    
+    const { x, y } = getCanvasPoint(e);
     ctx.beginPath();
-    ctx.moveTo(clientX - rect.left, clientY - rect.top);
+    ctx.moveTo(x, y);
     setIsDrawing(true);
   };
 
@@ -57,12 +108,10 @@ const DrawingPad = ({ onClose, onSaveToNote }) => {
     e.preventDefault(); // Prevent scrolling on touch devices
     const canvas = canvasRef.current;
     const ctx = canvas.getContext('2d');
-    const rect = canvas.getBoundingClientRect();
-    const clientX = e.touches ? e.touches[0].clientX : e.clientX;
-    const clientY = e.touches ? e.touches[0].clientY : e.clientY;
-    
-    ctx.lineTo(clientX - rect.left, clientY - rect.top);
-    
+    const { x, y } = getCanvasPoint(e);
+
+    ctx.lineTo(x, y);
+
     if (mode === 'eraser') {
       ctx.globalCompositeOperation = 'destination-out';
       ctx.lineWidth = thickness * 2; // Make eraser slightly bigger for ease of use
@@ -71,7 +120,7 @@ const DrawingPad = ({ onClose, onSaveToNote }) => {
       ctx.strokeStyle = color;
       ctx.lineWidth = thickness;
     }
-    
+
     ctx.lineCap = 'round';
     ctx.lineJoin = 'round';
     ctx.stroke();
@@ -86,8 +135,8 @@ const DrawingPad = ({ onClose, onSaveToNote }) => {
         <span style={{ fontSize: '12px', fontWeight: 600 }}>Mini Sketch</span>
         <button className="btn-icon" onClick={onClose} style={{ padding: 2, minWidth: 'auto' }}><X size={14} /></button>
       </div>
-      <div style={{ flex: 1, backgroundColor: 'transparent', position: 'relative', cursor: mode === 'eraser' ? 'cell' : 'crosshair' }}>
-        <canvas ref={canvasRef} width={260} height={275} onMouseDown={startDrawing} onMouseMove={draw} onMouseUp={stopDrawing} onMouseLeave={stopDrawing} onTouchStart={startDrawing} onTouchMove={draw} onTouchEnd={stopDrawing} style={{ display: 'block', touchAction: 'none' }} />
+      <div ref={canvasAreaRef} style={{ flex: 1, minHeight: 0, backgroundColor: 'transparent', position: 'relative', cursor: mode === 'eraser' ? 'cell' : 'crosshair', overflow: 'hidden' }}>
+        <canvas ref={canvasRef} width={260} height={275} onMouseDown={startDrawing} onMouseMove={draw} onMouseUp={stopDrawing} onMouseLeave={stopDrawing} onTouchStart={startDrawing} onTouchMove={draw} onTouchEnd={stopDrawing} style={{ display: 'block', width: '100%', height: '100%', touchAction: 'none' }} />
       </div>
       <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', padding: '12px', background: 'var(--bg-nav)', borderTop: '1px solid var(--border)' }}>
         <div style={{ display: 'flex', gap: '8px' }}>

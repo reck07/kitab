@@ -17,6 +17,9 @@ const Login = ({ onSkipLogin }) => {
     setMessage('');
 
     try {
+      if (!supabase) {
+        throw new Error('Cloud sync is not configured. Add VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY to .env, or continue without an account.');
+      }
       if (mode === 'signup') {
         const { error } = await supabase.auth.signUp({
           email,

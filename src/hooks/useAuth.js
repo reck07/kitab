@@ -8,7 +8,9 @@ export function useAuth() {
 
   useEffect(() => {
     if (!supabase) {
-      setAuthLoading(false);
+      // No Supabase client configured: settle loading asynchronously so the
+      // state update does not happen synchronously inside the effect body.
+      Promise.resolve().then(() => setAuthLoading(false));
       return;
     }
 

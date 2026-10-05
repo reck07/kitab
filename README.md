@@ -6,7 +6,8 @@ A high-performance, mobile-responsive notebook application built with React 19, 
 
 ## 🚀 Features
 
-* **Offline First**: Powered by Capacitor SQLite for reliable, fast local storage.
+* **Offline First**: Notes are written to `localStorage` in the browser and to Capacitor SQLite
+  on Android, so the editor works without a network connection.
 * **Cloud Sync & Auth**: Integrated with Supabase authentication, featuring a dedicated login page and automatic data syncing.
 * **Modern Graph & Analytics**: Visualized notes layout with graph zoom/pan features and automated auto-tagging.
 * **Productivity Utilities**: Built-in view switcher, "mind refresh" tool, quick app launcher, and Google Drive sync support.
@@ -47,7 +48,7 @@ You can download and install the latest pre-built application directly onto your
 * **Frontend**: React 19, Vite
 * **Backend/Auth**: Supabase
 * **Native Bridge**: Capacitor
-* **Database**: SQLite (via `@capacitor-community/sqlite`)
+* **Database**: `localStorage` on web, SQLite (via Capacitor) on Android, with Supabase for cloud sync
 * **Styling**: CSS3 utilizing CSS Variables for dynamic Theme Support
 
 ---
@@ -58,5 +59,22 @@ Follow these steps to set up the project locally for development:
 
 ### 1. Clone the Repository
 ```bash
-git clone [https://github.com/reck07/kitab.git](https://github.com/reck07/kitab.git)
+git clone https://github.com/reck07/kitab.git
 cd kitab
+npm install
+
+# Create your local env file, then fill in the values
+cp .env.example .env
+
+# Web dev server (http://localhost:5173)
+npm run dev
+
+# Build web assets and push them into the Android project
+npm run cap:sync
+
+# Debug APK -> android/app/build/outputs/apk/debug/
+npm run android:build
+```
+
+`.env` needs `VITE_SUPABASE_URL` and `VITE_SUPABASE_ANON_KEY`. Without them the app still
+runs, but cloud auth/sync is disabled and only local (guest) mode is available.

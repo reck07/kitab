@@ -1,6 +1,6 @@
 {
-  "appId": "com.kitab.notes",
-  "appName": "Kitab",
+  "appId": "com.kitab.notes.v2",
+  "appName": "Kitāb",
   "webDir": "dist",
   "server": {
     "androidScheme": "https"

@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react';
 import { X, Lock, Unlock, Shield, Key, Fingerprint, Eye, EyeOff, Timer, Info } from 'lucide-react';
 import { isNoteLocked } from './crypto';
-import { isWebAuthnAvailable, registerBiometric, authenticateBiometric } from './webauthn';
+import { isWebAuthnAvailable, registerBiometric } from './webauthn';
 
 const SecurityPanel = ({ onClose, notes, activeNoteId, onLockNote, onUnlockNote, biometricEnabled, onBiometricToggle, autoLockTimeout, onAutoLockTimeoutChange }) => {
   const activeNote = notes.find(n => n.id === activeNoteId);

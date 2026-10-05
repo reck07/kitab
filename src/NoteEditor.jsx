@@ -1,8 +1,18 @@
-import { useRef, useEffect, useState } from 'react';
-import { Bold, Italic, List, Heading1, Heading2, MessageSquare, Mic, Share2, Lock, Pin, Star, Archive, X, Image as ImageIcon, Smile, Bot, SpellCheck, FileText, ChevronRight, CheckSquare, Layout, Trash2, RotateCcw, FilePlus, QrCode, Calendar, Plus, Circle, Undo2, Redo2, Search, Sun, Printer, Download, GitBranch, Calculator as CalcIcon, Pencil, Shield, Zap, Cog, MoreHorizontal, Clock } from 'lucide-react';
+import { useRef, useEffect, useState, useCallback } from 'react';
+import { Bold, Italic, List, Heading1, Heading2, MessageSquare, Mic, Share2, Lock, Pin, Star, Archive, X, Image as ImageIcon, Smile, SpellCheck, CheckSquare, Layout, Trash2, RotateCcw, FilePlus, QrCode, Plus, SquareCheckBig, Undo2, Redo2, Search, Sun, Printer, Download, GitBranch, Calculator as CalcIcon, Pencil, Shield, Zap, Cog, MoreHorizontal, Clock } from 'lucide-react';
 import Tesseract from 'tesseract.js';
 import { PAPER_TYPES, CANVAS_SIZES, getPaperType } from './paperTypes';
 import { suggestTags } from './autoTag';
+
+// Fixed sparkle positions to avoid Math.random() during render (React purity)
+const SPARKLE_POSITIONS = [
+  { left: "25%", top: "30%", delay: "0.6s" },
+  { left: "40%", top: "55%", delay: "1.1s" },
+  { left: "55%", top: "25%", delay: "0.8s" },
+  { left: "65%", top: "45%", delay: "1.6s" },
+  { left: "35%", top: "40%", delay: "1.9s" },
+  { left: "70%", top: "35%", delay: "1.3s" },
+];
 
 const PaperBackground = ({ paperType }) => {
   return <div className={`paper-bg paper-${paperType}`} />;
@@ -11,10 +21,8 @@ const PaperBackground = ({ paperType }) => {
 const NoteEditor = ({ 
   activeNote, 
   onUpdate, 
-  onRemoveTag, 
   charCount, 
   wordCount, 
-  onCloseEditor,
   onTogglePin,
   onToggleFavorite,
   onToggleArchive,
@@ -27,11 +35,7 @@ const NoteEditor = ({
   editorActionsRef,
   onToggleFocus,
   focusMode,
-  onSaveTemplate,
-  onLoadTemplate,
   onThemeChange,
-  theme,
-  allTags,
   onAppAction,
   pinnedTools,
   onTogglePinTool,
@@ -42,23 +46,22 @@ const NoteEditor = ({
   const [isRecording, setIsRecording] = useState(false);
   const [showEmojiPicker, setShowEmojiPicker] = useState(false);
   const [grammarMatches, setGrammarMatches] = useState([]);
-  const [grammarLoading, setGrammarLoading] = useState(false);
+  const [, setGrammarLoading] = useState(false);
   const [isScanningImage, setIsScanningImage] = useState(false);
-  const [isToolsOpen, setIsToolsOpen] = useState(true);
   const [showOverflow, setShowOverflow] = useState(false);
   const overflowRef = useRef(null);
   const longPressTimer = useRef(null);
   const [showPaperSettings, setShowPaperSettings] = useState(false);
   const [showLayoutSettings, setShowLayoutSettings] = useState(false);
-  const [wikilinks, setWikilinks] = useState([]);
   const [justSaved, setJustSaved] = useState(false);
   const [showQRCode, setShowQRCode] = useState(false);
   const [showCalendar, setShowCalendar] = useState(false);
   const [showTodo, setShowTodo] = useState(false);
   const [qrText, setQrText] = useState('');
   const [todoItems, setTodoItems] = useState([]);
+  const [justMarkedId, setJustMarkedId] = useState(null);
   const [todoInput, setTodoInput] = useState('');
-  const [audioBlob, setAudioBlob] = useState(null);
+  const [, setAudioBlob] = useState(null);
   const [isRecordingAudio, setIsRecordingAudio] = useState(false);
   const mediaRecorderRef = useRef(null);
   const recognitionRef = useRef(null);
@@ -69,12 +72,8 @@ const NoteEditor = ({
   const [searchQuery, setSearchQuery] = useState('');
   const [searchMatchIdx, setSearchMatchIdx] = useState(0);
   const toolbarRef = useRef(null);
-  const [isEditorFocused, setIsEditorFocused] = useState(false);
+  const [, setIsEditorFocused] = useState(false);
   const searchInputRef = useRef(null);
-  const [tagInputValue, setTagInputValue] = useState('');
-  const [tagSuggestions, setTagSuggestions] = useState([]);
-  const [selectedSuggestionIdx, setSelectedSuggestionIdx] = useState(-1);
-  const tagInputRef = useRef(null);
 
   // Update editor content only when the active note changes
   useEffect(() => {
@@ -88,8 +87,7 @@ const NoteEditor = ({
       }
       editorRef.current.focus();
     }
-    const matches = [...(activeNote.content || '').matchAll(/\[\[(.*?)\]\]/g)];
-    setWikilinks(matches.map(m => m[1]));
+    
   }, [activeNote.id, activeNote.content]);
 
   const stripWikilinks = (html) => {
@@ -110,7 +108,7 @@ const NoteEditor = ({
     }
   };
 
-  const handleSave = () => {
+  const handleSave = useCallback(() => {
     if (!editorRef.current) return;
     const content = stripWikilinks(editorRef.current.innerHTML);
     onUpdate(activeNote.id, { content });
@@ -118,7 +116,7 @@ const NoteEditor = ({
     setTimeout(() => {
       setJustSaved(false);
     }, 2000);
-  };
+  }, [onUpdate, activeNote.id]);
 
   useEffect(() => {
     const onKey = (e) => {
@@ -231,16 +229,7 @@ const NoteEditor = ({
     highlightInEditor(searchQuery, prevIdx);
   };
 
-  const handleTagInput = (e) => {
-    if (e.key === 'Enter') {
-      const newTag = e.target.value.trim();
-      if (newTag && !activeNote.tags?.includes(newTag)) {
-        const updatedTags = [...(activeNote.tags || []), newTag];
-        onUpdate(activeNote.id, { tags: updatedTags });
-        e.target.value = '';
-      }
-    }
-  };
+  
 
   const handleVoiceInput = async () => {
     if (isRecording) {
@@ -310,7 +299,7 @@ const NoteEditor = ({
         await SpeechRecognition.start({ language: 'en-US', prompt: false });
         return;
       }
-    } catch (e) {
+    } catch {
       // Capacitor plugin not available, fall through to Web API
     }
 
@@ -342,14 +331,11 @@ const NoteEditor = ({
       };
 
       recognition.onresult = (event) => {
-        let interim_transcript = '';
         let final_transcript = '';
 
         for (let i = event.resultIndex; i < event.results.length; ++i) {
           if (event.results[i].isFinal) {
             final_transcript += event.results[i][0].transcript;
-          } else {
-            interim_transcript += event.results[i][0].transcript;
           }
         }
 
@@ -394,8 +380,13 @@ const NoteEditor = ({
     setTodoInput('');
   };
 
-  const handleToggleTodo = (id) => {
-    setTodoItems(todoItems.map(item => item.id === id ? { ...item, done: !item.done } : item));
+  // Standalone action button — marks the item complete. Not a checkbox and
+  // keeps no checked/unchecked input state of its own; only a transient
+  // `justMarkedId` highlight for visual feedback.
+  const handleMarkIt = (id) => {
+    setTodoItems(prev => prev.map(item => item.id === id ? { ...item, done: true } : item));
+    setJustMarkedId(id);
+    setTimeout(() => setJustMarkedId(prev => (prev === id ? null : prev)), 600);
   };
 
   const handleRemoveTodo = (id) => {
@@ -540,10 +531,6 @@ const NoteEditor = ({
     }
   };
 
-  const handleRemoveTagClick = (tagToRemove) => {
-    onRemoveTag(activeNote.id, tagToRemove);
-  };
-
   const handleCoverUpload = (e) => {
     const file = e.target.files[0];
     if (!file) return;
@@ -596,6 +583,7 @@ const NoteEditor = ({
         handleImageUpload: () => fileInputRef.current?.click(),
         handleEmojiPicker: () => setShowEmojiPicker(p => !p),
         handleGrammarCheck,
+        handleAudioAttach,
       };
     }
   });
@@ -645,11 +633,11 @@ const NoteEditor = ({
             }} />
           ))}
           <div className="sparkle-area">
-            {[...Array(6)].map((_, i) => (
+            {SPARKLE_POSITIONS.map((pos, i) => (
               <div key={i} className="refresh-sparkle" style={{
-                left: `${20 + Math.random() * 60}%`,
-                top: `${20 + Math.random() * 40}%`,
-                animationDelay: `${0.5 + Math.random() * 1.5}s`,
+                left: pos.left,
+                top: pos.top,
+                animationDelay: pos.delay,
               }} />
             ))}
           </div>
@@ -714,7 +702,16 @@ const NoteEditor = ({
               <div style={{ maxHeight: 160, overflowY: 'auto', marginBottom: 8 }}>
                 {todoItems.map(item => (
                   <div key={item.id} style={{ display: 'flex', alignItems: 'center', gap: 4, padding: '2px 0', fontSize: 12 }}>
-                    <Circle size={12} style={{ cursor: 'pointer', color: item.done ? 'var(--accent)' : 'var(--text-muted)', fill: item.done ? 'var(--accent)' : 'none' }} onClick={() => handleToggleTodo(item.id)} />
+                    <button
+                      className="mark-it-btn"
+                      onClick={() => handleMarkIt(item.id)}
+                      aria-label={`Mark "${item.text}" as done`}
+                      aria-disabled={item.done}
+                      style={justMarkedId === item.id ? { color: 'var(--accent)', borderColor: 'var(--accent)', background: 'color-mix(in srgb, var(--accent) 14%, transparent)' } : undefined}
+                    >
+                      <SquareCheckBig size={14} />
+                      Mark it
+                    </button>
                     <span style={{ flex: 1, textDecoration: item.done ? 'line-through' : 'none', opacity: item.done ? 0.5 : 1 }}>{item.text}</span>
                     <button className="btn-icon sm" onClick={() => handleRemoveTodo(item.id)} style={{ width: 18, height: 18 }}><X size={10} /></button>
                   </div>
@@ -792,7 +789,7 @@ const NoteEditor = ({
             )}
 
             <div className="editor-inline-toolbar">
-              <span className="toolbar-badge">{charCount}c · {wordCount}w</span>
+              <span className="toolbar-badge">{charCount}c · {wordCount}w · {readingTime} min read</span>
               <select
                 className="toolbar-font-select"
                 value={activeNote.fontSize || '17px'}
@@ -815,7 +812,7 @@ const NoteEditor = ({
                     if (tool) { onTogglePinTool(tool); btn.dataset.lp = '1'; }
                   }, 400);
                 }}
-                onPointerUp={(e) => {
+                onPointerUp={() => {
                   if (longPressTimer.current) { clearTimeout(longPressTimer.current); longPressTimer.current = null; }
                 }}
                 onPointerLeave={() => {
@@ -896,6 +893,8 @@ const NoteEditor = ({
                   {!pinnedTools.includes('image') && (<button className="inline-tool-btn" data-tool="image" onClick={() => fileInputRef.current?.click()} title="Image" onContextMenu={(e) => { e.preventDefault(); onTogglePinTool('image'); }}><ImageIcon size={16} strokeWidth={2} /></button>)}
                   {pinnedTools.includes('voice') && (<button className={`inline-tool-btn${isRecording ? ' recording' : ''}`} data-tool="voice" onClick={handleVoiceInput} title="Voice Input" onContextMenu={(e) => { e.preventDefault(); onTogglePinTool('voice'); }}><Mic size={16} strokeWidth={2} /></button>)}
                   {!pinnedTools.includes('voice') && (<button className={`inline-tool-btn${isRecording ? ' recording' : ''}`} data-tool="voice" onClick={handleVoiceInput} title="Voice Input" onContextMenu={(e) => { e.preventDefault(); onTogglePinTool('voice'); }}><Mic size={16} strokeWidth={2} /></button>)}
+                  {pinnedTools.includes('audio') && (<button className={`inline-tool-btn${isRecordingAudio ? ' recording' : ''}`} data-tool="audio" onClick={handleAudioAttach} title={isRecordingAudio ? 'Stop Recording' : 'Record Audio Clip'} onContextMenu={(e) => { e.preventDefault(); onTogglePinTool('audio'); }}><Mic size={16} strokeWidth={2} /></button>)}
+                  {!pinnedTools.includes('audio') && (<button className={`inline-tool-btn${isRecordingAudio ? ' recording' : ''}`} data-tool="audio" onClick={handleAudioAttach} title={isRecordingAudio ? 'Stop Recording' : 'Record Audio Clip'} onContextMenu={(e) => { e.preventDefault(); onTogglePinTool('audio'); }}><Mic size={16} strokeWidth={2} /></button>)}
                   {pinnedTools.includes('emoji') && (<button className="inline-tool-btn" data-tool="emoji" onClick={() => setShowEmojiPicker(!showEmojiPicker)} title="Emoji" onContextMenu={(e) => { e.preventDefault(); onTogglePinTool('emoji'); }}><Smile size={16} strokeWidth={2} /></button>)}
                   {!pinnedTools.includes('emoji') && (<button className="inline-tool-btn" data-tool="emoji" onClick={() => setShowEmojiPicker(!showEmojiPicker)} title="Emoji" onContextMenu={(e) => { e.preventDefault(); onTogglePinTool('emoji'); }}><Smile size={16} strokeWidth={2} /></button>)}
                   {pinnedTools.includes('grammar') && (<button className="inline-tool-btn" data-tool="grammar" onClick={handleGrammarCheck} title="Grammar" onContextMenu={(e) => { e.preventDefault(); onTogglePinTool('grammar'); }}><SpellCheck size={16} strokeWidth={2} /></button>)}

@@ -33,9 +33,11 @@ const CommandPalette = ({ onClose, actions }) => {
     inputRef.current?.focus();
   }, []);
 
-  useEffect(() => {
+  // Reset selection when query changes (done inline to avoid setState in effect)
+  const handleQueryChange = (newQuery) => {
+    setQuery(newQuery);
     setSelectedIdx(0);
-  }, [query]);
+  };
 
   const handleKeyDown = (e) => {
     if (e.key === 'ArrowDown') {
@@ -76,7 +78,7 @@ const CommandPalette = ({ onClose, actions }) => {
           ref={inputRef}
           type="text"
           value={query}
-          onChange={e => setQuery(e.target.value)}
+          onChange={e => handleQueryChange(e.target.value)}
           onKeyDown={handleKeyDown}
           placeholder="Type a command..."
           style={{

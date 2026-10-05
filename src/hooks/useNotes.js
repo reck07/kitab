@@ -71,7 +71,7 @@ export function useNotes(user) {
       let latestNote = currentNotes.find(n => n.id === id);
       if (!latestNote) return;
 
-      const onUpdateActions = evaluateRules(latestNote, 'onUpdate', currentNotes);
+      const onUpdateActions = evaluateRules(latestNote, 'onUpdate');
       if (onUpdateActions.length > 0) {
         const processed = applyActions(latestNote, onUpdateActions);
         currentNotes = currentNotes.map(n => n.id === id ? processed : n);
@@ -114,7 +114,13 @@ export function useNotes(user) {
   }, []);
 
   useEffect(() => {
-    if (user) fetchNotes(user.id);
+    if (!user) return;
+    // Load asynchronously so the state updates are not synchronous with the
+    // effect body (avoids cascading renders during mount).
+    const timer = setTimeout(() => {
+      fetchNotes(user.id).catch(err => console.error('Fetch notes failed:', err));
+    }, 0);
+    return () => clearTimeout(timer);
   }, [user, fetchNotes]);
 
   const addPage = useCallback(async () => {
@@ -135,7 +141,7 @@ export function useNotes(user) {
       created_at: new Date().toISOString(),
       updated_at: new Date().toISOString()
     };
-    const actions = evaluateRules(newNote, 'onCreate', notes);
+    const actions = evaluateRules(newNote, 'onCreate');
     const processedNote = actions.length > 0 ? applyActions(newNote, actions) : newNote;
     if (actions.length > 0) Object.assign(newNote, processedNote);
     if (user && supabase) supabase.from('notes').insert(newNote).then().catch(() => {});
@@ -158,14 +164,20 @@ export function useNotes(user) {
     const updatedNotes = notes.map(n => n.id === id ? { ...n, isRecycled: false, updated_at: new Date().toISOString() } : n);
     setNotes(updatedNotes);
     localStorage.setItem('notes', JSON.stringify(updatedNotes));
-    if (user && supabase) supabase.from('notes').upsert({ ...updatedNotes.find(n => n.id === id), user_id: user.id }).then().catch(() => {});
+    if (user && supabase) {
+      supabase.from('notes').upsert({ ...updatedNotes.find(n => n.id === id), user_id: user.id })
+        .catch(err => console.error('Sync failed (removePage):', err));
+    }
     setActiveNoteId(id);
   }, [notes, user]);
 
   const permanentlyDelete = useCallback(async (id) => {
     if (!window.confirm("Permanently delete this note? This cannot be undone.")) return;
     if (saveTimeoutsRef.current[id]) clearTimeout(saveTimeoutsRef.current[id]);
-    if (user && supabase) { try { await supabase.from('notes').delete().eq('id', id); } catch {} }
+    if (user && supabase) {
+      try { await supabase.from('notes').delete().eq('id', id); }
+      catch (err) { console.error('Sync failed (permanentlyDelete):', err); }
+    }
     const remainingNotes = notes.filter(n => n.id !== id);
     setNotes(remainingNotes);
     localStorage.setItem('notes', JSON.stringify(remainingNotes));

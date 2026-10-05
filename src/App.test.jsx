@@ -51,17 +51,23 @@ beforeAll(() => {
 describe('App', () => {
   beforeEach(() => { vi.clearAllMocks(); window.localStorage.clear(); });
 
-  test('renders app with authenticated user', async () => {
+  test('renders app shell with brand for an authenticated user', async () => {
     render(<App />);
-    expect(await screen.findByText(/test@test.com/i)).toBeInTheDocument();
-    expect(screen.getByText(/Kitāb/i)).toBeInTheDocument();
+    // Brand label is always present once the auth check resolves.
+    expect(await screen.findByText(/kitāb/i)).toBeInTheDocument();
+    // The navbar renders the signed-in avatar (first letter of the email).
+    await waitFor(() => {
+      expect(screen.getByTitle('Sign Out')).toBeInTheDocument();
+    });
+    expect(screen.getByText('T')).toBeInTheDocument();
   });
 
-  test('creates a default note on New Note click via FAB', async () => {
+  test('creates a new note from the New Note button', async () => {
     render(<App />);
-    expect(await screen.findByText(/test@test.com/i)).toBeInTheDocument();
+    await screen.findByText(/kitāb/i);
 
-    fireEvent.click(screen.getByTitle('Toggle Tools'));
+    // Let the seeded default note finish loading first.
+    await screen.findByText('Core Principles of Simple UI');
     fireEvent.click(screen.getByTitle('New Note'));
 
     await waitFor(() => {
