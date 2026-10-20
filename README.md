@@ -2,6 +2,9 @@
 
 A high-performance, responsive, cross-platform personal notebook application built with **React 19, Vite, and Capacitor**. Designed with an offline-first architecture, it enables users to create, organize, and manage notes seamlessly across web and Android devices, with cloud synchronization and secure authentication.
 
+You can directly used the application give the feedback
+download link : https://drive.google.com/file/d/1zUiO0eCjC6q8Ab5CVngf1u7sTbMLPD2Q/view?usp=drivesdk
+
 ### Key Features
 
 - **Offline-First Architecture:** Supports local note storage using browser `localStorage` and Capacitor SQLite on Android, allowing users to create and edit notes without an internet connection.
