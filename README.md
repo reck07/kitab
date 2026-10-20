@@ -1,21 +1,43 @@
-# Notebook Pro 📝 (Kitab)
+# Personal Notebook — Smart Notes & Productivity App
 
-A high-performance, mobile-responsive notebook application built with React 19, Vite, and Capacitor. This application features a robust offline-first architecture using SQLite alongside cloud synchronization capabilities.
+A high-performance, responsive, cross-platform personal notebook application built with **React 19, Vite, and Capacitor**. Designed with an offline-first architecture, it enables users to create, organize, and manage notes seamlessly across web and Android devices, with cloud synchronization and secure authentication.
 
----
+### Key Features
 
-## 🚀 Features
+- **Offline-First Architecture:** Supports local note storage using browser `localStorage` and Capacitor SQLite on Android, allowing users to create and edit notes without an internet connection.
 
-* **Offline First**: Notes are written to `localStorage` in the browser and to Capacitor SQLite
-  on Android, so the editor works without a network connection.
-* **Cloud Sync & Auth**: Integrated with Supabase authentication, featuring a dedicated login page and automatic data syncing.
-* **Modern Graph & Analytics**: Visualized notes layout with graph zoom/pan features and automated auto-tagging.
-* **Productivity Utilities**: Built-in view switcher, "mind refresh" tool, quick app launcher, and Google Drive sync support.
-* **Recycle Bin**: Safety first with a soft-delete and restore mechanism for your notes.
-* **Rich Text Editing**: Advanced editor toolbar with support for bold, italics, lists, tag management, and real-time character counting.
-* **Auto-Save**: Debounced persistence logic to keep your data safe without sacrificing mobile performance.
-* **Sleek UI/UX**: Full dark mode support, polished timeline views featuring compact hexagon layouts (36x42), and responsive transitions.
-* **Cross-Platform**: Built from the ground up to run seamlessly on Web and Android.
+- **Cloud Synchronization & Authentication:** Integrates Supabase authentication and cloud-based data synchronization to support secure access and cross-device note management.
+
+- **Interactive Graph Visualization:** Provides a visual representation of notes with zoom and pan controls, making it easier to explore and navigate connected information.
+
+- **Smart Tagging & Organization:** Includes automated tag generation and tag management to improve note categorization and retrieval.
+
+- **Productivity Tools:** Features multiple viewing modes, a Mind Refresh tool, and a quick app launcher for a more efficient and personalized workflow.
+
+- **Google Drive Integration:** Supports Google Drive synchronization capabilities for convenient file management and backup workflows.
+
+- **Recycle Bin & Recovery:** Implements soft deletion, allowing users to restore accidentally deleted notes before permanently removing them.
+
+- **Rich Text Editor:** Offers formatting tools for bold and italic text, lists, tag management, and real-time character counting.
+
+- **Automatic Saving:** Uses debounced persistence to save changes efficiently, reducing unnecessary storage operations while maintaining a smooth editing experience.
+
+- **Modern UI/UX:** Features a clean, mobile-responsive interface with full dark mode support, timeline-based navigation, compact hexagonal layouts (36 × 42), and smooth transitions.
+
+- **Cross-Platform Compatibility:** Built with React and Capacitor to support web browsers and Android devices through a shared application codebase.
+
+### Technology Stack
+
+- **Frontend:** React 19, Vite, JavaScript, CSS
+- **Mobile Framework:** Capacitor
+- **Local Storage:** Browser localStorage, SQLite on Android
+- **Backend & Authentication:** Supabase
+- **Cloud Integration:** Supabase synchronization and Google Drive integration
+- **Core Capabilities:** Offline note editing, automatic saving, rich text formatting, smart tagging, graph visualization, and note recovery
+
+### Project Goal
+
+To deliver a reliable, fast, and user-friendly personal knowledge management application that combines offline accessibility, cloud synchronization, flexible note organization, and productivity tools in a single cross-platform experience.
 <img width="400" height="222" alt="Screenshot 2026-07-11 134059" src="https://github.com/user-attachments/assets/1711d363-4581-4439-b4fc-1035be8c9444" />
 <img width="751" height="587" alt="Screenshot 2026-07-11 133914" src="https://github.com/user-attachments/assets/a542b534-3d69-4fbd-9d1a-7b792dc5232a" />
 <img width="407" height="859" alt="Screenshot 2026-07-11 134215" src="https://github.com/user-attachments/assets/1c98477b-8644-4523-a58c-397589c29a7b" /><img width="407" height="704" alt="Screenshot 2026-07-11 134116" src="https://github.com/user-attachments/assets/1ef9118e-2dfa-4155-983a-0e96307482e0" />
